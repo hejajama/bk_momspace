@@ -21,7 +21,7 @@ Amplitude::Amplitude()
         ktsqrvals.push_back(MINKTSQR * std::pow(KTSQR_MULTIPLIER, i) );
     for (int i=0; i<POINTS_Y; i++)
         yvals.push_back((REAL) i * DELTA_Y);
-
+    averages=0;
 }
 
 /*
@@ -371,7 +371,7 @@ void Amplitude::Solve(REAL maxy)
     cout << endl << "#" << largedifference << " out of " << maxyind * (POINTS_KTSQR-1)
             << " too large differences" << endl;
     // Again
-    for (int avg=0; avg<1; avg++)
+    for (int avg=0; avg<averages; avg++)
     {
         
         largedifference=0;
@@ -463,4 +463,9 @@ REAL Amplitude::Yval(int i)
 void Amplitude::SetKinematicConstraint(bool kc)
 {
     kinematic_constraint=kc;
+}
+
+void Amplitude::SetNumberOfAveragements(int avg)
+{
+    averages=avg;
 }

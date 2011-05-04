@@ -49,6 +49,7 @@ class Amplitude
         void SetInitialCondition(INITIAL_CONDITION i);
         void SetKinematicConstraint(bool kc);
         string InitialConditionStr();
+        void SetNumberOfAveragements(int avg);
         
     private:
         REAL InitialCondition(REAL ktsqr);  // N() at y=0
@@ -64,6 +65,7 @@ class Amplitude
 
         INITIAL_CONDITION ic;
         bool kinematic_constraint;
+        int averages;
 
        // doublexyz *interpolated_amplitude;
 

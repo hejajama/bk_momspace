@@ -37,6 +37,7 @@ int main(int argc, char* argv[])
     REAL y_points = 10;
     INITIAL_CONDITION ic=FTIPSAT;
     bool kc=false;  // Kinematical constraint
+    int avg=0;
 
     gsl_set_error_handler(&ErrHandler);
 
@@ -53,6 +54,7 @@ int main(int argc, char* argv[])
         cout << "-minktsqr, -maxktsqr: range of k_T^2 to plot, doesn't affect to limits when solving BK" << endl;
         cout << "-ic [initial condition]: set initial condition, possible ones are FTIPSAT, INVPOWER " << endl;
         cout << "-kc: apply kinematical constraint" << endl;
+        cout << "-avg [avgs]: number or averagements" << endl;
         return 0;
     } 
 
@@ -74,6 +76,8 @@ int main(int argc, char* argv[])
             file_prefix=argv[i+1];
         else if (string(argv[i])=="-kc")
             kc=true;
+        else if (string(argv[i])=="-avg")
+            avg=StrToInt(argv[i+1]);
         else if (string(argv[i])=="-ic")
         {
             if (string(argv[i+1])=="FTIPSAT")
@@ -94,6 +98,7 @@ int main(int argc, char* argv[])
     }
     N.SetInitialCondition(ic);
     N.SetKinematicConstraint(kc);
+    N.SetNumberOfAveragements(avg);
     N.Initialize();
 
     std::stringstream infostr;
@@ -104,6 +109,7 @@ int main(int argc, char* argv[])
     infostr << "# Initial condition: " << N.InitialConditionStr() <<  endl;
     infostr << "# Grid size: ktsqrpoints x ypoints = " << POINTS_KTSQR << " x " << (int)(maxy/DELTA_Y)
         << " = " << POINTS_KTSQR*(int)(maxy/DELTA_Y) << endl;
+    infostr << "# Number of averagements: " << avg << endl;
     cout << infostr.str();
 
     //cout << N.Ktsqrval(1000);
