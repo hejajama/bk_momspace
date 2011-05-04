@@ -5,7 +5,6 @@
  
 
 #include "config.hpp"
-#include "function.hpp"
 #include "amplitude.hpp"
 #include "tools.hpp"
 #include <gsl/gsl_errno.h>
