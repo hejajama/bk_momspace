@@ -1,4 +1,4 @@
-CXXFLAGS = `gsl-config --cflags` -g -I ./libbci-1.1.0/  
+CXXFLAGS = `gsl-config --cflags` -O2 -I ./libbci-1.1.0/ -fopenmp 
 LDFLAGS = `gsl-config --libs` -lm
 
 SOURCES = src/main.cpp src/amplitude.cpp src/tools.cpp

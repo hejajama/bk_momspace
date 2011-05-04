@@ -12,6 +12,8 @@ using std::cout;
 using std::cerr;
 using std::cin;
 using std::endl;
+#include <string>
+using std::string;
 
 typedef double REAL;
 
