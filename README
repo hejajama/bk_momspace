@@ -1,0 +1,23 @@
+BK solver
+Heikki Mäntysaari <heikki.mantysaari@jyu.fi> 2011
+
+Solves BK equation in momentum space.
+
+== Output data structure ==
+Files output_y[yval].dat contain calculated datapoints in the following format:
+- Lines starting with (one) # are comments and should not be parsed
+- First 3 lines are: minimum value of ktsqr, ktsqr multiplier, number of values in file
+- These lines begin with "###"
+- So that ktsqr[i] = minktsqr*pow(ktsqr_multiplier, i)
+- Then in the rest of the file the syntax is
+- ktsqr n(ktsqr, y)
+e.g.
+# Here we have solved BK!
+###1e-08
+###1.015
+###2783
+1e-08 10.0000001
+etc
+
+Rows must be sorted such that ktsqr grows when we move down in the file
+

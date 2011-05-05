@@ -11,17 +11,17 @@
 #include <cmath>
 //#include <bci.h>
 
-const REAL DELTA_Y=0.1;
-const int MAXY=50;
-const REAL KTSQR_MULTIPLIER = 1.02;  // ktsqr_{i+1} = ktsqr_i*KTSQR_MULTIPLIER
-const REAL MINKTSQR = 1e-7;
-const REAL MAXKTSQR = 1e9;
+const REAL DEFAULT_DELTA_Y=0.1;
+const unsigned int DEFAULT_MAXY=50;
+const REAL DEFAULT_KTSQR_MULTIPLIER = 1.015;  // ktsqr_{i+1} = ktsqr_i*KTSQR_MULTIPLIER
+const REAL DEFAULT_MINKTSQR = 1e-8;
+const REAL DEFAULT_MAXKTSQR = 1e10;
 
-const int POINTS_Y= (int)(MAXY/DELTA_Y);
-const int POINTS_KTSQR = (int)(std::log(MAXKTSQR/MINKTSQR) / std::log(KTSQR_MULTIPLIER) );
+//const unsigned int POINTS_Y= (int)(MAXY/DELTA_Y);
+//const unsigned int POINTS_KTSQR = (int)(std::log(MAXKTSQR/MINKTSQR) / std::log(KTSQR_MULTIPLIER) );
 
-const REAL KTSQRINTACCURACY = 0.01;
-const int KTSQRINTITERATIONS = 7000;
+const REAL KTSQRINTACCURACY = 0.005;
+const unsigned int KTSQRINTITERATIONS = 9000;
 
 enum INITIAL_CONDITION
 {
@@ -37,6 +37,7 @@ class Amplitude
         void Initialize();
         REAL N(REAL ktsqr, REAL y);
         REAL RapidityDerivative(REAL ktsqr, REAL y);
+        REAL LogLogDerivative(REAL ktsqr, REAL y);
 
         void AddDataPoint(int ktsqrindex, int yindex, REAL value, REAL der);
 
@@ -44,12 +45,23 @@ class Amplitude
 
         void Solve(REAL maxy);
 
-        REAL Ktsqrval(int i);
-        REAL Yval(int i);
+        REAL Ktsqrval(unsigned int i);
+        REAL Yval(unsigned int i);
         void SetInitialCondition(INITIAL_CONDITION i);
         void SetKinematicConstraint(bool kc);
         string InitialConditionStr();
         void SetNumberOfAveragements(int avg);
+
+        void SetMinKtsqr(REAL mkt);
+        void SetMaxKtsqr(REAL mkt);
+        void SetKtsqrMultiplier(REAL m);
+        void SetMaxY(REAL y);
+        void SetDeltaY(REAL dy);
+
+        unsigned int YPoints();
+        unsigned int KtsqrPoints();
+        REAL KtsqrMultiplier();
+        REAL DeltaY();
         
     private:
         REAL InitialCondition(REAL ktsqr);  // N() at y=0
@@ -67,7 +79,11 @@ class Amplitude
         bool kinematic_constraint;
         int averages;
 
-       // doublexyz *interpolated_amplitude;
+        REAL minktsqr;
+        REAL maxktsqr;
+        REAL ktsqr_multiplier;
+        REAL maxy;
+        REAL delta_y;
 
         
         

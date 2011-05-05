@@ -17,10 +17,11 @@ using std::abs;
 
 Amplitude::Amplitude()
 {
-    for (int i=0; i<POINTS_KTSQR; i++)
-        ktsqrvals.push_back(MINKTSQR * std::pow(KTSQR_MULTIPLIER, i) );
-    for (int i=0; i<POINTS_Y; i++)
-        yvals.push_back((REAL) i * DELTA_Y);
+    maxktsqr = DEFAULT_MAXKTSQR;
+    minktsqr = DEFAULT_MINKTSQR;
+    ktsqr_multiplier = DEFAULT_KTSQR_MULTIPLIER;
+    maxy = DEFAULT_MAXY;
+    delta_y = DEFAULT_DELTA_Y;
     averages=0;
 }
 
@@ -30,7 +31,19 @@ Amplitude::Amplitude()
  */
 void Amplitude::Initialize()
 {
-    for (int i=0; i<POINTS_KTSQR; i++)   // Intialize every kt
+    ktsqrvals.clear();
+    yvals.clear();
+
+    for (unsigned int i=0; i<n.size(); i++)
+        n[i].clear();
+    n.clear();
+    
+    for (unsigned int i=0; i<KtsqrPoints(); i++)
+        ktsqrvals.push_back(minktsqr * std::pow(ktsqr_multiplier, (int)i) );
+    for (unsigned int i=0; i<YPoints()+1; i++)
+        yvals.push_back((REAL) i * delta_y);
+    
+    for (unsigned int i=0; i<KtsqrPoints(); i++)   // Intialize every kt
     {
         std::vector<REAL> tmpvec;
         std::vector<REAL> tmpdervec;
@@ -38,7 +51,7 @@ void Amplitude::Initialize()
         // y=0 initial condition
         tmpvec.push_back(InitialCondition( ktsqrvals[i] ));
         tmpdervec.push_back(-1.0);
-        for (int j=1; j<POINTS_Y; j++)
+        for (unsigned int j=1; j<=YPoints(); j++)
         {
             tmpvec.push_back(-1.0);
             tmpdervec.push_back(-1.0);
@@ -63,7 +76,7 @@ REAL Amplitude::N(REAL ktsqr, REAL y)
     // val[index]  is smaller than (or equal) y/ktsqr
     int yind = -1;
     int ktsqrind=-1;
-    for (int i=0; i<=yvals.size()-2; i++)
+    for (unsigned int i=0; i<yvals.size(); i++)
     {
         if (yvals[i]<=y and yvals[i+1]>y)
         {
@@ -74,10 +87,10 @@ REAL Amplitude::N(REAL ktsqr, REAL y)
     if (yind < 0) // Didn't find, so refers to the largest one 
     {
         yind=yvals.size()-2;
-        cerr << "Asked amplitude at too large Y, falling back to "
+        cerr << "Asked amplitude at too large Y=" << y << ", falling back to "
             << " y=" << yvals[yind] << ". " << LINEINFO << endl;
     }
-    for (int i=0; i<=ktsqrvals.size()-2; i++)
+    for (unsigned int i=0; i<=ktsqrvals.size()-2; i++)
     {
         if (ktsqrvals[i]<=ktsqr and ktsqrvals[i+1]>ktsqr)
         {
@@ -127,53 +140,10 @@ REAL Amplitude::N(REAL ktsqr, REAL y)
 
 /*
  * Interpolate
- * Interpolates data using libbci (cubic 2d interpolation)
- * Assumes that n[ktsqr][y] is filled up to y=y_max
- * Performance probably wery bad
- *
- * TODO: REQUIRES SQUARE DATA MATRIX :(
+ * TODO, or remove completely?
  */
 void Amplitude::Interpolate()
-{/*
-    if (interpolated_amplitude != NULL)
-        delete[] interpolated_amplitude;
-
-    // Search largest yind
-    int maxyind=-1;
-    for (int i=POINTS_Y-1; i>=0; i--)
-    {
-        if (n[0][i]>-eps)
-        {
-            maxyind=i;
-            break;
-        }
-    }
-    if (maxyind==-1)
-    {
-        cerr << "Didn't find maxyind! " << LINEINFO << endl;
-        return;
-    }
-
-    cout << "Interpolating up to yind=" << maxyind << endl;
-
-    doublexyz *tmparray = new doublexyz[POINTS_KTSQR * (maxyind+1)];
-    for (int ktind = 0; ktind < POINTS_KTSQR; ktind++)
-    {
-        for (int yind=0; yind <= maxyind; yind++)
-        {
-            tmparray[maxyind*ktind+yind].x = ktsqrvals[ktind];
-            tmparray[maxyind*ktind+yind].y = yvals[yind];
-            tmparray[maxyind*ktind+yind].z = n[ktind][yind];
-        }
-    }
-
-    // 10 times more points in x and y axis
-    interpolated_amplitude = new doublexyz[POINTS_KTSQR*10*(maxyind+1)*10];
-    td_fillgrid(tmparray, POINTS_KTSQR, maxyind+1, interpolated_amplitude,
-        POINTS_KTSQR*10, (maxyind+1)*10 );
-
-    delete[] tmparray;
-*/    
+{
     
 
 }
@@ -237,7 +207,7 @@ REAL inthelperf_bkmom_noconstraint(REAL ktsqr, void* p)
      *  sgn(k'^2 - k^2)/k^2 [N(k^2) + k'^2 N'(k^2) ] + N(k^2)/( Sqrt[5] k^2 )
      */
 
-    if (abs(ktsqr - par->ktsqr) < 1e-12)
+    if (abs(ktsqr - par->ktsqr) < 1e-14)
     {
         cerr << "ktsqr \\approx par->ktsqr and we can't handle this! y=" << par->y
            << " par->ktsqr=" << par->ktsqr << " ktsqr: " << ktsqr << endl;
@@ -278,7 +248,7 @@ REAL inthelperf_bkmom_constraint(REAL ktsqr, void* p)
     inthelper_bkmom* par = (inthelper_bkmom*) p;
 
     REAL result=0;
-    if (abs(ktsqr - par->ktsqr) < 1e-12)
+    if (abs(ktsqr - par->ktsqr) < 1e-14)
     {
         cerr << "ktsqr \\approx par->ktsqr and we can't handle this! y=" << par->y
             << " par->ktsqr=" << par->ktsqr << " at " << LINEINFO << endl;
@@ -315,7 +285,7 @@ REAL Amplitude::RapidityDerivative(REAL ktsqr, REAL y)
         int_helper.function=&inthelperf_bkmom_constraint;
     int_helper.params=&inthelp;
 
-    REAL result, abserr; size_t eval;
+    REAL result, abserr; 
     gsl_integration_workspace *workspace 
      = gsl_integration_workspace_alloc(KTSQRINTITERATIONS); 
     int status=gsl_integration_qag(&int_helper, ktsqrvals[0], ktsqrvals[ktsqrvals.size()-2], 0, KTSQRINTACCURACY, 
@@ -336,20 +306,20 @@ REAL Amplitude::RapidityDerivative(REAL ktsqr, REAL y)
 void Amplitude::Solve(REAL maxy)
 {
     // Find maxyind corresponding to maxy
-    int maxyind=POINTS_Y-1;
-    for (int i=1; i<POINTS_Y; i++)
+    int maxyind=YPoints();
+    for (unsigned int i=1; i<=YPoints(); i++)
     {
         if (yvals[i]>maxy)
             { maxyind=i; break; }
     }
     int largedifference=0;
-    for (int yind=1; yind<maxyind; yind++)
+    for (int yind=1; yind<=maxyind; yind++)
     {
         cerr << "Solving for y=" << yvals[yind] << endl;
         // Solve N(y+DELTA_Y, kt) for every kt
 
 #pragma omp parallel for
-        for (int ktsqrind=0; ktsqrind<POINTS_KTSQR-1; ktsqrind++)
+        for (unsigned int ktsqrind=0; ktsqrind<KtsqrPoints()-1; ktsqrind++)
         {
             REAL tmpkt = ktsqrvals[ktsqrind];
             REAL tmpder = RapidityDerivative(tmpkt, yvals[yind-1]);
@@ -368,7 +338,7 @@ void Amplitude::Solve(REAL maxy)
             
         }
     }
-    cout << endl << "#" << largedifference << " out of " << maxyind * (POINTS_KTSQR-1)
+    cout << endl << "#" << largedifference << " out of " << maxyind * (KtsqrPoints()-1)
             << " too large differences" << endl;
     // Again
     for (int avg=0; avg<averages; avg++)
@@ -379,8 +349,10 @@ void Amplitude::Solve(REAL maxy)
         {
             //cout << "Solving for y=" << yvals[yind] << endl;
             // Solve N(y+DELTA_Y, kt) for every kt
+            ///TODO: Different iterations are not independent, but the difference
+            /// caused by different order of execution should be higher order?
 #pragma omp parallel for
-            for (int ktsqrind=0; ktsqrind<POINTS_KTSQR-1; ktsqrind++)
+            for (unsigned int ktsqrind=0; ktsqrind<KtsqrPoints()-1; ktsqrind++)
             {
                 REAL tmpkt = ktsqrvals[ktsqrind];
                 REAL tmpder = RapidityDerivative(tmpkt, yvals[yind]);
@@ -397,10 +369,20 @@ void Amplitude::Solve(REAL maxy)
                 
             }
         }
-        cout << endl << "#" << largedifference << " out of " << maxyind * (POINTS_KTSQR-1)
+        cout << endl << "#" << largedifference << " out of " << maxyind * (KtsqrPoints()-1)
             << " too large differences" << endl;
     }
 
+}
+
+/*
+ * d ln N(ktsqr) / d ln(ktsqr) = d ktsqr / d ln Ktsqr d ln N(ktsqr) /d ktsqr
+ * = ktsqr d ln N(ktsqr) / d ksqr = ktsqr/eps ln [ N(ktsqr + eps) / N(ktsqr) ]
+ */
+REAL Amplitude::LogLogDerivative(REAL ktsqr, REAL y)
+{
+    REAL epsilon = ktsqr/1000.0;
+    return ktsqr/epsilon*log(N(ktsqr+epsilon,y)/N(ktsqr, y) );
 }
 
 
@@ -419,6 +401,7 @@ REAL Amplitude::InitialCondition(REAL ktsqr)
             cerr << "Unrecognized initial condition " << ic << endl;
     }
     //return exp(-0.5*SQR(log(ktsqr)-1)); // hep-ph/0110325 (bk+kinematical constraint)
+    return -1.0;
 }
 
 void Amplitude::SetInitialCondition(INITIAL_CONDITION i)
@@ -442,7 +425,7 @@ string Amplitude::InitialConditionStr()
     }
 }
 
-REAL Amplitude::Ktsqrval(int i)
+REAL Amplitude::Ktsqrval(unsigned int i)
 {
     if (i > ktsqrvals.size()-1 or i<0)
     {
@@ -451,7 +434,7 @@ REAL Amplitude::Ktsqrval(int i)
     return ktsqrvals[i];
 }
 
-REAL Amplitude::Yval(int i)
+REAL Amplitude::Yval(unsigned int i)
 {
     if (i > yvals.size()-1 or i<0)
     {
@@ -468,4 +451,50 @@ void Amplitude::SetKinematicConstraint(bool kc)
 void Amplitude::SetNumberOfAveragements(int avg)
 {
     averages=avg;
+}
+
+void Amplitude::SetMinKtsqr(REAL mkt)
+{
+    minktsqr = mkt;
+}
+
+void Amplitude::SetMaxKtsqr(REAL mkt)
+{
+    maxktsqr = mkt;
+}
+
+void Amplitude::SetKtsqrMultiplier(REAL m)
+{
+    ktsqr_multiplier=m;
+}
+
+void Amplitude::SetMaxY(REAL y)
+{
+    maxy=y;
+
+}
+
+void Amplitude::SetDeltaY(REAL dy)
+{
+    delta_y = dy;
+}
+
+unsigned int Amplitude::YPoints()
+{
+    return static_cast<unsigned int>(maxy/delta_y)+1;
+}
+
+unsigned int Amplitude::KtsqrPoints()
+{
+    return static_cast<unsigned int>(std::log(maxktsqr/minktsqr) / std::log(ktsqr_multiplier) );
+}
+
+REAL Amplitude::DeltaY()
+{
+    return delta_y;
+}
+
+REAL Amplitude::KtsqrMultiplier()
+{
+    return ktsqr_multiplier;
 }
