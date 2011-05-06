@@ -27,7 +27,8 @@ enum OUTPUT
 
 enum MODE
 {
-    GENERATE_DATA,      // Solve and print output to files
+    GENERATE_DATAFILE,      // Solve and print output to one huge file
+    GENERATE_PLOTS,         // Print output to different files with constant rapidity
     LOGLOG_DERIVATIVE   // Calculate d ln N(k^2) / d ln(k^2)
 };
 
@@ -45,7 +46,7 @@ int main(int argc, char* argv[])
     REAL delta_datay = 1;
     REAL y_points = 10;
     INITIAL_CONDITION ic=FTIPSAT;
-    MODE mode=GENERATE_DATA;
+    MODE mode=GENERATE_DATAFILE;
     bool kc=false;  // Kinematical constraint
     bool read_data=false;
     string datafile;
@@ -118,7 +119,7 @@ int main(int argc, char* argv[])
         else if (string(argv[i])=="-mode")
         {
             if (string(argv[i+1])=="GENERATE_DATA")
-                mode=GENERATE_DATA;
+                mode=GENERATE_DATAFILE;
             else if (string(argv[i+1])=="LOGLOG_DERIVATIVE")
                 mode=LOGLOG_DERIVATIVE;
             else
@@ -156,18 +157,22 @@ int main(int argc, char* argv[])
     infostr << "# Number of averagements: " << avg << endl;
     cout << infostr.str();
 
-    
-    if (mode==GENERATE_DATA)
+    std::ofstream output_data;
+    if (mode==GENERATE_DATAFILE)
     {
+        y_points = N.YPoints();
         // First 3 non-comment lines, see README for syntax reference
         infostr << "###" <<minktsqr << endl << "###" << N.KtsqrMultiplier() << endl
             << "###" << N.KtsqrPoints()-1 << endl;
         N.Solve(maxy);
+        std::stringstream s; s << file_prefix; s << ".dat";
+        output_data.open(s.str().c_str());
+        output_data << infostr.str() ;
     }
     else
     {
         // Read data from files
-
+    
 
     }
     int ktsqrpoints = N.KtsqrPoints();
@@ -177,35 +182,44 @@ int main(int argc, char* argv[])
     {
         REAL tmpy = miny + (maxy-miny)/(REAL)(y_points) * yind;
 
-        std::ofstream out;
-        if (output == OUTPUT_FILE)
+        std::ofstream *output;
+        
+        if (mode == GENERATE_PLOTS)
         {
+            std::ofstream out;
             std::stringstream s;
             s << file_prefix << "_y" << tmpy << ".dat";
             string fname; s >> fname;
             out.open(fname.c_str());
 
-            
-            
             out << infostr.str();
-            out << "# ktsqr    N(ktsqr, y=" << tmpy << ")" << endl;
+
+            output = &out;
         }
-        
-       // cout << endl << endl << endl;
+        else if (mode == GENERATE_DATAFILE)
+        {
+            // Start new y
+            output = &output_data;
+        }
+
+        (*output) << "###" << tmpy << endl;
+        (*output) << "# ktsqr    N(ktsqr, y=" << tmpy << ")" << endl;
+       
         
         for (int i=0; i<ktsqrpoints-1; i++)
         {
             REAL tmpktsqr = minktsqr*std::pow(ktsqr_mult, i);
-            if (output == OUTPUT_TERMINAL)
-            {
-                cout << tmpktsqr << " " << N.N(tmpktsqr, tmpy) << endl;
-            } else if (output == OUTPUT_FILE)
-            {
-                out << tmpktsqr << " " << N.N(tmpktsqr, tmpy) << endl;
-            }
+            if (mode == GENERATE_PLOTS) (*output) << tmpktsqr << " ";
+            (*output) << N.N(tmpktsqr, tmpy) << endl;
+            
         }
-        out.close();
+
+        if (mode == GENERATE_PLOTS)
+            (*output).close();
     }
+
+    if (mode == GENERATE_DATAFILE)
+        output_data.close();
 /*
     N.AddDataPoint(0, 1, 8);
     N.AddDataPoint(0, 2, 3);

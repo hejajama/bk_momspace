@@ -23,11 +23,12 @@ class DataFile
         REAL KtsqrMultiplier();
         REAL KtsqrPoints();
 
-        std::vector<REAL>& GetData();
+        std::vector<std::vector<REAL> >& GetData();
 
     private:
         string filename;
-        std::vector<REAL> data;
+        std::vector<std::vector <REAL> > data;
+        std::vector<REAL> yvals;
         REAL minktsqr;
         REAL ktsqr_multiplier;
         unsigned int ktsqrpoints;

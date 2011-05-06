@@ -22,7 +22,7 @@ DataFile::DataFile(string fname)
         return;
     }
     int confid=0;
-    while(!file.eof())
+    while(!file.eof() and confid < 3)
     {
         string line;
         getline(file, line);
@@ -31,13 +31,13 @@ DataFile::DataFile(string fname)
             switch (confid)
             {
                 case 0:
-                    minktsqr = StrToReal(line);
+                    minktsqr = StrToReal(line.substr(3,line.length()-3));
                     break;
                 case 1:
-                    ktsqr_multiplier = StrToReal(line);
+                    ktsqr_multiplier = StrToReal(line.substr(3,line.length()-3));
                     break;
                 case 2:
-                    ktsqrpoints = StrToInt(line);
+                    ktsqrpoints = StrToInt(line.substr(3,line.length()-3));
                     break;
                 default:
                     cerr << "File " << fname << " is formatted incorrectly!" << endl;
@@ -45,15 +45,38 @@ DataFile::DataFile(string fname)
             }
             confid++;
         }
+    }
 
+    // Ok, configurations are read, then read all yvals
+    REAL y=-1;
+    std::vector<REAL> tmpvec;
+    while (!file.eof())
+    {
+        string line;
+        getline(file, line);
         if (line.substr(0,1)=="#")
             continue;   // Comment
 
-        // Ok, so this is ktsqr N pair
-        stringstream ss; string tmp;
-        ss << line;
-        ss >> tmp; tmp=""; ss >> tmp;   // Second word is what we are interested in
-        data.push_back(StrToReal(tmp));
+        // New rapidity?
+        if (line.substr(0,3)=="###")
+        {
+            if (tmpvec.size()>0)
+                data.push_back(tmpvec);
+
+            if (tmpvec.size()>0 and tmpvec.size() != ktsqrpoints)
+                {
+                    cerr << "File " << fname << ": read " << tmpvec.size() << " ktsqrpoints, but "
+                    << "there should have been " << ktsqrpoints << " points, y=" << y << endl;
+                }
+
+            y = StrToReal(line.substr(3,line.length()-3));
+            yvals.push_back(y);
+            tmpvec.clear();
+            continue;   // Next line is probably new amplitude value
+        }
+
+        // Ok, so this a new amplitude value
+        tmpvec.push_back(StrToReal(line));
     }
 
     if (data.size() != ktsqrpoints)
@@ -63,9 +86,20 @@ DataFile::DataFile(string fname)
     }
 }
 
-std::vector<REAL>& DataFile::GetData()
+std::vector< std::vector<REAL> >& DataFile::GetData()
 {
-    return data;
+    // Return vector where indexes are vec[ktsqr][y]
+    std::vector< std::vector<REAL> > *result = new std::vector< std::vector<REAL> >;
+    for (int k=0; k<ktsqrpoints; k++)
+    {
+        std::vector<REAL> tmpvec;
+        for (int y=0; y<data.size(); y++)
+        {
+            tmpvec.push_back(data[y][k]);
+        }
+        (*result).push_back(tmpvec);
+    }
+    return (*result);
 }
 
 REAL DataFile::MinKtsqr()

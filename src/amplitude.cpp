@@ -425,6 +425,14 @@ string Amplitude::InitialConditionStr()
     }
 }
 
+
+int Amplitude::ReadData(string prefix, REAL maxdatay, REAL dy)
+{
+
+
+}
+
+
 REAL Amplitude::Ktsqrval(unsigned int i)
 {
     if (i > ktsqrvals.size()-1 or i<0)

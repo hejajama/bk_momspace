@@ -41,6 +41,8 @@ class Amplitude
 
         void AddDataPoint(int ktsqrindex, int yindex, REAL value, REAL der);
 
+        int ReadData(string prefix, REAL maxdatay, REAL dy);
+
         void Interpolate();
 
         void Solve(REAL maxy);

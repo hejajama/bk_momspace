@@ -6,7 +6,7 @@ Solves BK equation in momentum space.
 == Output data structure ==
 Files output_y[yval].dat contain calculated datapoints in the following format:
 - Lines starting with (one) # are comments and should not be parsed
-- First 3 lines are: minimum value of ktsqr, ktsqr multiplier, number of values in file
+- First 4 lines are: rapidity, minimum value of ktsqr, ktsqr multiplier, number of values in file
 - These lines begin with "###"
 - So that ktsqr[i] = minktsqr*pow(ktsqr_multiplier, i)
 - Then in the rest of the file the syntax is
@@ -16,8 +16,21 @@ e.g.
 ###1e-08
 ###1.015
 ###2783
+###10.0
 1e-08 10.0000001
 etc
 
 Rows must be sorted such that ktsqr grows when we move down in the file
 
+All data can also be saved in one file output.dat, where syntax is
+###min ktsqr
+###ktsqr multiplier
+###number of ktsqr values
+###y rapidity
+amplitude       
+amplitud2       [here ktsqr=minktsqr*pow(ktsqr multiplier, i=1)
+etc.
+###y rapidity2
+amplitude
+
+and so on.
