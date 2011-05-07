@@ -49,7 +49,7 @@ int main(int argc, char* argv[])
     MODE mode=GENERATE_DATAFILE;
     bool kc=false;  // Kinematical constraint
     bool read_data=false;
-    string datafile;
+    string datafile="output";
     int avg=0;
 
     gsl_set_error_handler(&ErrHandler);
@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
     if (argc>1)  if (string(argv[1])=="-help")
     {
         cout << "Usage: " << endl;
-        cout << "-mode [MODE]: what to do, modes: GENERATE_DATA, LOGLOG_DERIVATIVE" << endl;
+        cout << "-mode [MODE]: what to do, modes: GENERATE_DATA, GENERATE_PLOTS, LOGLOG_DERIVATIVE" << endl;
         cout << "-output [prefix]: set output file prefix, filenames are prefix_y[rapidity].dat" << endl;
         cout << "-miny, -maxy: rapidity values to solve" << endl;
         //cout << "-minktsqr, -maxktsqr: range of k_T^2 to plot, doesn't affect to limits when solving BK" << endl;
@@ -71,6 +71,7 @@ int main(int argc, char* argv[])
         cout << "-avg [avgs]: number or averagements" << endl;
         cout << "-data [datafile]: read data from datafiles from path datafile_y[rapdity].dat" << endl;
         cout << "  -maxdatay [yval]: set maximum y value for datafiles, -delta_datay [yval] difference of yvals for datafiles" << endl;
+        cout << "-y [yval]: rapidity value for e.g. loglog derivative" << endl;
         return 0;
     } 
 
@@ -100,6 +101,8 @@ int main(int argc, char* argv[])
             read_data=true;
             datafile= argv[i+1];
         }
+        else if (string(argv[i])=="-y")
+			y=StrToReal(argv[i+1]);
         else if (string(argv[i])=="-maxdatay")
             maxdatay = StrToInt(argv[i+1]);
         else if (string(argv[i])=="-delta_datay")
@@ -122,6 +125,8 @@ int main(int argc, char* argv[])
                 mode=GENERATE_DATAFILE;
             else if (string(argv[i+1])=="LOGLOG_DERIVATIVE")
                 mode=LOGLOG_DERIVATIVE;
+			else if (string(argv[i+1])=="GENERATE_PLOTS")
+				mode=GENERATE_PLOTS;
             else
             {
                 cerr << "Unrecognized mode " << argv[i+1] << ", exiting..." << endl;
@@ -146,17 +151,7 @@ int main(int argc, char* argv[])
     }
     N.Initialize();
 
-    std::stringstream infostr;
-    infostr << "# Yrange [" << miny << ", " << maxy << "], k_T^2 limits for "
-        << "output are [" << minktsqr << ", " << maxktsqr << "]" << endl;
-    infostr << "# Kinematical constraint is ";
-    if (kc) infostr << "applied"; else infostr << "not applied"; infostr << endl;
-    infostr << "# Initial condition: " << N.InitialConditionStr() <<  endl;
-    infostr << "# Grid size: ktsqrpoints x ypoints = " << N.KtsqrPoints() << " x " << N.YPoints()
-        << " = " << N.KtsqrPoints()*N.YPoints() << endl;
-    infostr << "# Number of averagements: " << avg << endl;
-    cout << infostr.str();
-
+	std::stringstream infostr;
     std::ofstream output_data;
     if (mode==GENERATE_DATAFILE)
     {
@@ -171,55 +166,96 @@ int main(int argc, char* argv[])
     }
     else
     {
-        // Read data from files
-    
+        // Read data from file
+		std::stringstream s; s<<datafile; s << ".dat";
+		N.ReadData(s.str());    
+		infostr << "# Data read from file " << s.str() << endl;
 
     }
     int ktsqrpoints = N.KtsqrPoints();
 
-
-    for (int yind=0; yind <= y_points; yind++)
+    infostr << "# Yrange [" << miny << ", " << maxy << "], k_T^2 limits for "
+        << "output are [" << minktsqr << ", " << maxktsqr << "]" << endl;
+    infostr << "# Kinematical constraint is ";
+    if (kc) infostr << "applied"; else infostr << "not applied"; infostr << endl;
+    infostr << "# Initial condition: " << N.InitialConditionStr() <<  endl;
+    infostr << "# Grid size: ktsqrpoints x ypoints = " << N.KtsqrPoints() << " x " << N.YPoints()
+        << " = " << N.KtsqrPoints()*N.YPoints() << endl;
+    infostr << "# Number of averagements: " << avg << endl;
+    cout << infostr.str();
+    
+    
+    
+    ////// Different operation modes
+    
+    if (mode == GENERATE_DATAFILE or mode==GENERATE_PLOTS)
     {
-        REAL tmpy = miny + (maxy-miny)/(REAL)(y_points) * yind;
+		if (mode == GENERATE_DATAFILE)
+			output_data << infostr.str() << endl;
 
-        std::ofstream *output;
-        
-        if (mode == GENERATE_PLOTS)
-        {
-            std::ofstream out;
-            std::stringstream s;
-            s << file_prefix << "_y" << tmpy << ".dat";
-            string fname; s >> fname;
-            out.open(fname.c_str());
 
-            out << infostr.str();
+		for (int yind=0; yind <= y_points; yind++)
+		{
+			REAL tmpy = miny + (maxy-miny)/(REAL)(y_points) * yind;
 
-            output = &out;
-        }
-        else if (mode == GENERATE_DATAFILE)
-        {
-            // Start new y
-            output = &output_data;
-        }
+			std::ofstream *output;
+			
+			if (mode == GENERATE_PLOTS)
+			{
+				std::ofstream *out = new std::ofstream;
+				std::stringstream s;
+				s << file_prefix << "_y" << tmpy << ".dat";
+				string fname; s >> fname;
+				(*out).open(fname.c_str());
 
-        (*output) << "###" << tmpy << endl;
-        (*output) << "# ktsqr    N(ktsqr, y=" << tmpy << ")" << endl;
-       
-        
-        for (int i=0; i<ktsqrpoints-1; i++)
-        {
-            REAL tmpktsqr = minktsqr*std::pow(ktsqr_mult, i);
-            if (mode == GENERATE_PLOTS) (*output) << tmpktsqr << " ";
-            (*output) << N.N(tmpktsqr, tmpy) << endl;
-            
-        }
+				(*out) << infostr.str();
 
-        if (mode == GENERATE_PLOTS)
-            (*output).close();
-    }
+				output = out;
+			}
+			else if (mode == GENERATE_DATAFILE)
+			{
+				// Start new y
+				output = &output_data;
+			}
 
-    if (mode == GENERATE_DATAFILE)
-        output_data.close();
+			(*output) << "###" << tmpy << endl;
+			(*output) << "# ktsqr    N(ktsqr, y=" << tmpy << ")" << endl;
+		   
+			
+			for (int i=0; i<ktsqrpoints-1; i++)
+			{
+				REAL tmpktsqr = minktsqr*std::pow(ktsqr_mult, i);
+				if (mode == GENERATE_PLOTS) (*output) << tmpktsqr << " ";
+				(*output) << N.N(tmpktsqr, tmpy) << endl;
+				
+			}
+
+			if (mode == GENERATE_PLOTS)
+			{
+				(*output).close();
+				delete output;
+			}
+		}
+
+		if (mode == GENERATE_DATAFILE)
+			output_data.close();
+	}
+	
+	
+	else if (mode == LOGLOG_DERIVATIVE)
+	{
+		cout << "# d ln N(k^2) / d ln (k^2), y=" << y << endl;
+		cout << "#ktsqr derivative " << endl;
+		
+		for (int i=0; i<ktsqrpoints-1; i++)
+		{
+			REAL tmpktsqr = minktsqr*std::pow(ktsqr_mult, i);
+			cout << tmpktsqr << " " << N.LogLogDerivative(tmpktsqr, y) << endl;
+			
+		}
+		
+		
+	}
 /*
     N.AddDataPoint(0, 1, 8);
     N.AddDataPoint(0, 2, 3);

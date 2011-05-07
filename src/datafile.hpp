@@ -22,8 +22,10 @@ class DataFile
         REAL MinKtsqr();
         REAL KtsqrMultiplier();
         REAL KtsqrPoints();
+		REAL MaxY();
+		REAL DeltaY();
 
-        std::vector<std::vector<REAL> >& GetData();
+        void GetData(std::vector< std::vector<REAL> > &n);
 
     private:
         string filename;

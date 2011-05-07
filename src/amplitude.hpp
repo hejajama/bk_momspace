@@ -35,13 +35,14 @@ class Amplitude
     public:
         Amplitude();
         void Initialize();
+		void Clear();
         REAL N(REAL ktsqr, REAL y);
         REAL RapidityDerivative(REAL ktsqr, REAL y);
         REAL LogLogDerivative(REAL ktsqr, REAL y);
 
         void AddDataPoint(int ktsqrindex, int yindex, REAL value, REAL der);
 
-        int ReadData(string prefix, REAL maxdatay, REAL dy);
+        int ReadData(string file);
 
         void Interpolate();
 
@@ -87,7 +88,7 @@ class Amplitude
         REAL maxy;
         REAL delta_y;
 
-        
+        bool datafile;	// True if data is read from external file
         
         
 };

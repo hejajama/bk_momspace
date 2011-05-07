@@ -43,7 +43,7 @@ DataFile::DataFile(string fname)
                     cerr << "File " << fname << " is formatted incorrectly!" << endl;
                     break;
             }
-            confid++;
+            confid++; 
         }
     }
 
@@ -54,8 +54,6 @@ DataFile::DataFile(string fname)
     {
         string line;
         getline(file, line);
-        if (line.substr(0,1)=="#")
-            continue;   // Comment
 
         // New rapidity?
         if (line.substr(0,3)=="###")
@@ -66,7 +64,8 @@ DataFile::DataFile(string fname)
             if (tmpvec.size()>0 and tmpvec.size() != ktsqrpoints)
                 {
                     cerr << "File " << fname << ": read " << tmpvec.size() << " ktsqrpoints, but "
-                    << "there should have been " << ktsqrpoints << " points, y=" << y << endl;
+                    << "there should have been " << ktsqrpoints << " points, y=" 
+                    << ". " << LINEINFO << endl;
                 }
 
             y = StrToReal(line.substr(3,line.length()-3));
@@ -74,22 +73,27 @@ DataFile::DataFile(string fname)
             tmpvec.clear();
             continue;   // Next line is probably new amplitude value
         }
+        else if (line.substr(0,1)=="#")
+            continue;   // Comment
 
         // Ok, so this a new amplitude value
         tmpvec.push_back(StrToReal(line));
     }
 
-    if (data.size() != ktsqrpoints)
+    if (data[0].size() != ktsqrpoints)
     {
         cerr << "File " << fname << ": read " << data.size() << " ktsqrpoints, but "
-        << "there should have been " << ktsqrpoints << " points???" << endl;
+        << "there should have been " << ktsqrpoints << " points???" << LINEINFO << endl;
     }
 }
 
-std::vector< std::vector<REAL> >& DataFile::GetData()
+void DataFile::GetData(std::vector< std::vector<REAL> > &n)
 {
+	/*if (n[0].size()>1)	// Contains more that intial condition (which will be overrided also)
+		cerr << "Got non-empty table for amplitude values? " << LINEINFO << endl;
+	*/
+	n.clear();
     // Return vector where indexes are vec[ktsqr][y]
-    std::vector< std::vector<REAL> > *result = new std::vector< std::vector<REAL> >;
     for (int k=0; k<ktsqrpoints; k++)
     {
         std::vector<REAL> tmpvec;
@@ -97,9 +101,8 @@ std::vector< std::vector<REAL> >& DataFile::GetData()
         {
             tmpvec.push_back(data[y][k]);
         }
-        (*result).push_back(tmpvec);
+        n.push_back(tmpvec);
     }
-    return (*result);
 }
 
 REAL DataFile::MinKtsqr()
@@ -115,4 +118,15 @@ REAL DataFile::KtsqrMultiplier()
 REAL DataFile::KtsqrPoints()
 {
         return ktsqrpoints;
+}
+
+REAL DataFile::MaxY()
+{
+	return yvals[yvals.size()-1];
+}
+
+REAL DataFile::DeltaY()
+{
+	//NOTE: Assumes that y[n+1]-y[n]=const
+	return yvals[1]-yvals[0];
 }

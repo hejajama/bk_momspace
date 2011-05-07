@@ -4,6 +4,7 @@
  */
 
 #include "amplitude.hpp"
+#include "datafile.hpp"
 //#include <bci.h>
 #include <vector>
 #include <gsl/gsl_sf_gamma.h>
@@ -23,6 +24,21 @@ Amplitude::Amplitude()
     maxy = DEFAULT_MAXY;
     delta_y = DEFAULT_DELTA_Y;
     averages=0;
+    datafile=false;
+}
+
+/*
+ * Clear all
+ */
+void Amplitude::Clear()
+{
+	ktsqrvals.clear();
+	yvals.clear();
+
+    for (unsigned int i=0; i<n.size(); i++)
+        n[i].clear();
+    n.clear();
+ 
 }
 
 /*
@@ -31,13 +47,7 @@ Amplitude::Amplitude()
  */
 void Amplitude::Initialize()
 {
-    ktsqrvals.clear();
-    yvals.clear();
-
-    for (unsigned int i=0; i<n.size(); i++)
-        n[i].clear();
-    n.clear();
-    
+	Clear();
     for (unsigned int i=0; i<KtsqrPoints(); i++)
         ktsqrvals.push_back(minktsqr * std::pow(ktsqr_multiplier, (int)i) );
     for (unsigned int i=0; i<YPoints()+1; i++)
@@ -67,8 +77,8 @@ void Amplitude::Initialize()
 
 REAL Amplitude::N(REAL ktsqr, REAL y)
 {
-    if (y<eps) return InitialCondition(ktsqr);
-
+    if (y<eps and datafile==false) return InitialCondition(ktsqr);
+	if (y<0) y=0;
     // Linear interpolation or even extrapolation
     // TODO: SPLINE
 
@@ -411,6 +421,10 @@ void Amplitude::SetInitialCondition(INITIAL_CONDITION i)
 
 string Amplitude::InitialConditionStr()
 {
+	if (datafile==true)
+	{
+		return "Data is read from a file, don't know what initial condition was used";
+	}
     switch (ic)
     {
         case INVPOWER:
@@ -426,10 +440,21 @@ string Amplitude::InitialConditionStr()
 }
 
 
-int Amplitude::ReadData(string prefix, REAL maxdatay, REAL dy)
+int Amplitude::ReadData(string file)
 {
+	Clear();
+	DataFile f(file);
+	SetMinKtsqr(f.MinKtsqr());
+	SetKtsqrMultiplier(f.KtsqrMultiplier());
+	SetMaxKtsqr(minktsqr*pow(KtsqrMultiplier(), f.KtsqrPoints()));	
+	SetMaxY(f.MaxY());
+	SetDeltaY(f.DeltaY());
+	Initialize();
 
+	f.GetData(n);
 
+	datafile=true;
+	return 0;
 }
 
 
