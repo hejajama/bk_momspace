@@ -153,36 +153,38 @@ int main(int argc, char* argv[])
 
 	std::stringstream infostr;
     std::ofstream output_data;
-    if (mode==GENERATE_DATAFILE)
+    
+    if (mode != GENERATE_DATAFILE)
     {
-        y_points = N.YPoints();
-        // First 3 non-comment lines, see README for syntax reference
-        infostr << "###" <<minktsqr << endl << "###" << N.KtsqrMultiplier() << endl
-            << "###" << N.KtsqrPoints()-1 << endl;
-        N.Solve(maxy);
-        std::stringstream s; s << file_prefix; s << ".dat";
-        output_data.open(s.str().c_str());
-        output_data << infostr.str() ;
+		// We read data from a file
+		N.ReadData(datafile);    
+		infostr << "# Data read from file " << datafile << endl;
     }
-    else
-    {
-        // Read data from file
-		std::stringstream s; s<<datafile; s << ".dat";
-		N.ReadData(s.str());    
-		infostr << "# Data read from file " << s.str() << endl;
-
-    }
+    
     int ktsqrpoints = N.KtsqrPoints();
 
     infostr << "# Yrange [" << miny << ", " << maxy << "], k_T^2 limits for "
         << "output are [" << minktsqr << ", " << maxktsqr << "]" << endl;
     infostr << "# Kinematical constraint is ";
-    if (kc) infostr << "applied"; else infostr << "not applied"; infostr << endl;
+    if (mode == GENERATE_DATAFILE)
+    { if (kc) infostr << "applied"; else infostr << "not applied"; infostr << endl; }
     infostr << "# Initial condition: " << N.InitialConditionStr() <<  endl;
     infostr << "# Grid size: ktsqrpoints x ypoints = " << N.KtsqrPoints() << " x " << N.YPoints()
         << " = " << N.KtsqrPoints()*N.YPoints() << endl;
     infostr << "# Number of averagements: " << avg << endl;
     cout << infostr.str();
+    
+    if (mode==GENERATE_DATAFILE)
+    {
+        y_points = N.YPoints();
+        N.Solve(maxy);
+        std::stringstream s; s << file_prefix; s << ".dat";
+        output_data.open(s.str().c_str());
+        output_data << infostr.str() ;
+        // First 3 non-comment lines, see README for syntax reference
+        output_data << "###" <<minktsqr << endl << "###" << N.KtsqrMultiplier() << endl
+            << "###" << N.KtsqrPoints()-1 << endl;
+    }
     
     
     
@@ -190,9 +192,6 @@ int main(int argc, char* argv[])
     
     if (mode == GENERATE_DATAFILE or mode==GENERATE_PLOTS)
     {
-		if (mode == GENERATE_DATAFILE)
-			output_data << infostr.str() << endl;
-
 
 		for (int yind=0; yind <= y_points; yind++)
 		{

@@ -116,26 +116,53 @@ REAL Amplitude::N(REAL ktsqr, REAL y)
     }
 
     // Keep y fixed, interpolate ktsqr
-    ///FIXME: SSLLLLOOOOWW
-    /*
-    REAL *tmparray = new double[POINTS_KTSQR];
-    REAL *tmpxarray = new double[POINTS_KTSQR];
-    for (int i=0; i< POINTS_KTSQR; i++)
+    // Interpolate only INTERPOLATION_POINTS points in order to make this
+    // almost fast
+    // Interpolate linearly in y and use spline in ktsqr
+    unsigned int interpolation_start, interpolation_end;
+    if (ktsqrind - INTERPOLATION_POINTS/2 < 0)
     {
-        tmparray[i]=n[i][yind];
-        tmpxarray[i]=ktsqrvals[i];
+		interpolation_start=0;
+		interpolation_end=INTERPOLATION_POINTS;
+	}
+	else if (ktsqrind + INTERPOLATION_POINTS/2 > KtsqrPoints()-1 )
+	{
+		interpolation_end = KtsqrPoints()-1;
+		interpolation_start = KtsqrPoints()-INTERPOLATION_POINTS-1;
+	}
+	else
+	{
+		interpolation_start = ktsqrind - INTERPOLATION_POINTS/2;
+		interpolation_end = ktsqrind + INTERPOLATION_POINTS/2;
+	}
+	int interpo_points = interpolation_end - interpolation_start+1;
+    
+    REAL *tmparray = new REAL[interpo_points];
+    REAL *tmpxarray = new REAL[interpo_points];
+    for (int i=interpolation_start; i<= interpolation_end; i++)
+    {
+		tmpxarray[i-interpolation_start]=ktsqrvals[i];
+		
+		if (n[ktsqrind][yind+1]>-eps and y-yvals[yind]>eps)
+        {	// Interpolate in y linearly
+			tmparray[i-interpolation_start]=n[i][yind] 
+			 + (y - yvals[yind]) * (n[i][yind+1] - n[i][yind]) / (yvals[yind+1]-yvals[yind]); 
+		} 
+		else
+			tmparray[i-interpolation_start] = n[i][yind];
     }
     gsl_interp_accel *acc = gsl_interp_accel_alloc();
-    gsl_spline *spline = gsl_spline_alloc(gsl_interp_cspline, POINTS_KTSQR);
-    gsl_spline_init(spline, tmpxarray, tmparray, POINTS_KTSQR);
+    gsl_spline *spline = gsl_spline_alloc(gsl_interp_cspline, interpo_points);
+    gsl_spline_init(spline, tmpxarray, tmparray, interpo_points);
 
     REAL res = gsl_spline_eval(spline, ktsqr, acc);
     gsl_spline_free(spline);
     gsl_interp_accel_free(acc);
+    delete[] tmparray;
+    delete[] tmpxarray;
+    return res;
 
-    ///TODO: interpolate in y
-    */
-    // Linear
+    
     REAL linear = n[ktsqrind][yind] +
         (ktsqr - ktsqrvals[ktsqrind]) *
             (n[ktsqrind+1][yind] - n[ktsqrind][yind]) / (ktsqrvals[ktsqrind+1] - ktsqrvals[ktsqrind]);
@@ -143,8 +170,10 @@ REAL Amplitude::N(REAL ktsqr, REAL y)
         linear += (y - yvals[yind]) * (n[ktsqrind][yind+1] - n[ktsqrind][yind]) / (yvals[yind+1]-yvals[yind]);
     
 
-    //cout << "Spline: " << res << "  linear: " << linear << endl;
-    return linear;
+    //if (std::abs(res-linear)/res > 0.01 and linear>eps)
+	//	cout << "At ktsqr=" << ktsqr << ", y=" << y << " reldifference " << std::abs(res-linear)/res << endl;
+    //return linear;
+    
 
 }
 
