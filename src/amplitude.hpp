@@ -22,7 +22,7 @@ const REAL DEFAULT_MAXKTSQR = 1e10;
 
 const REAL KTSQRINTACCURACY = 0.005;
 const int KTSQRINTITERATIONS = 9000;
-const int INTERPOLATION_POINTS = 100;
+const int INTERPOLATION_POINTS = 10;
 
 enum INITIAL_CONDITION
 {
@@ -90,6 +90,8 @@ class Amplitude
         REAL delta_y;
 
         bool datafile;	// True if data is read from external file
+
+        bool adams_method;   // Whether the Adams method should be used when solvin DE
         
         
 };

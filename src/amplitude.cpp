@@ -25,6 +25,7 @@ Amplitude::Amplitude()
     delta_y = DEFAULT_DELTA_Y;
     averages=0;
     datafile=false;
+    adams_method=false;
 }
 
 /*
@@ -60,11 +61,11 @@ void Amplitude::Initialize()
 
         // y=0 initial condition
         tmpvec.push_back(InitialCondition( ktsqrvals[i] ));
-        tmpdervec.push_back(-1.0);
+        tmpdervec.push_back(0.0);
         for (unsigned int j=1; j<=YPoints(); j++)
         {
             tmpvec.push_back(-1.0);
-            tmpdervec.push_back(-1.0);
+            tmpdervec.push_back(0.0);
         }
         n.push_back(tmpvec);
         derivatives.push_back(tmpdervec);
@@ -86,7 +87,7 @@ REAL Amplitude::N(REAL ktsqr, REAL y)
     // val[index]  is smaller than (or equal) y/ktsqr
     int yind = -1;
     int ktsqrind=-1;
-    for (unsigned int i=0; i<yvals.size(); i++)
+    for (unsigned int i=0; i<yvals.size()-1; i++)
     {
         if (yvals[i]<=y and yvals[i+1]>y)
         {
@@ -119,16 +120,17 @@ REAL Amplitude::N(REAL ktsqr, REAL y)
     // Interpolate only INTERPOLATION_POINTS points in order to make this
     // almost fast
     // Interpolate linearly in y and use spline in ktsqr
+
     unsigned int interpolation_start, interpolation_end;
     if (ktsqrind - INTERPOLATION_POINTS/2 < 0)
     {
 		interpolation_start=0;
 		interpolation_end=INTERPOLATION_POINTS;
 	}
-	else if (ktsqrind + INTERPOLATION_POINTS/2 > KtsqrPoints()-1 )
+	else if (ktsqrind + INTERPOLATION_POINTS/2 > KtsqrPoints()-2 )
 	{
-		interpolation_end = KtsqrPoints()-1;
-		interpolation_start = KtsqrPoints()-INTERPOLATION_POINTS-1;
+		interpolation_end = KtsqrPoints()-2;
+		interpolation_start = KtsqrPoints()-INTERPOLATION_POINTS-2;
 	}
 	else
 	{
@@ -141,6 +143,9 @@ REAL Amplitude::N(REAL ktsqr, REAL y)
     REAL *tmpxarray = new REAL[interpo_points];
     for (int i=interpolation_start; i<= interpolation_end; i++)
     {
+       // if (ktsqrind == 2734)
+       //     cout << "Setting tmpxarray[" << i-interpolation_start << " to "
+       // <<ktsqrvals[i] << ", i=" << i << " ktsqr=" << ktsqr << endl;
 		tmpxarray[i-interpolation_start]=ktsqrvals[i];
 		
 		if (n[ktsqrind][yind+1]>-eps and y-yvals[yind]>eps)
@@ -151,6 +156,11 @@ REAL Amplitude::N(REAL ktsqr, REAL y)
 		else
 			tmparray[i-interpolation_start] = n[i][yind];
     }
+
+    if (interpolation_start>2000 and tmpxarray[0]<1)
+        cerr <<"tmpxarray[0]=" << tmpxarray[0] << " at y="<<y<< ", ktsqr=" << ktsqr
+        << " ktsqrind=" << ktsqrind << ", interpolation_start: " << interpolation_start << endl;
+    
     gsl_interp_accel *acc = gsl_interp_accel_alloc();
     gsl_spline *spline = gsl_spline_alloc(gsl_interp_cspline, interpo_points);
     gsl_spline_init(spline, tmpxarray, tmparray, interpo_points);
@@ -160,7 +170,7 @@ REAL Amplitude::N(REAL ktsqr, REAL y)
     gsl_interp_accel_free(acc);
     delete[] tmparray;
     delete[] tmpxarray;
-    return res;
+    //return res;
 
     
     REAL linear = n[ktsqrind][yind] +
@@ -170,9 +180,11 @@ REAL Amplitude::N(REAL ktsqr, REAL y)
         linear += (y - yvals[yind]) * (n[ktsqrind][yind+1] - n[ktsqrind][yind]) / (yvals[yind+1]-yvals[yind]);
     
 
-    //if (std::abs(res-linear)/res > 0.01 and linear>eps)
-	//	cout << "At ktsqr=" << ktsqr << ", y=" << y << " reldifference " << std::abs(res-linear)/res << endl;
+    if (std::abs(res-linear)/res > 0.5 and linear>eps)
+		cout << "At ktsqr=" << ktsqr << ", y=" << y << " reldifference " << std::abs(res-linear)/res << endl;
     //return linear;
+    
+    return res;
     
 
 }
@@ -211,7 +223,7 @@ void Amplitude::AddDataPoint(int ktsqrindex, int yindex, REAL value, REAL der)
             << yindex << ". " << LINEINFO << endl; */
     n[ktsqrindex][yindex]=value;
 
-    if (yindex>0)
+    if (yindex>=0)
         derivatives[ktsqrindex][yindex-1]=der;
     else
         cerr << "Added data point with yindex=" << yindex << " " << LINEINFO << endl;
@@ -361,14 +373,23 @@ void Amplitude::Solve(REAL maxy)
         for (unsigned int ktsqrind=0; ktsqrind<KtsqrPoints()-1; ktsqrind++)
         {
             REAL tmpkt = ktsqrvals[ktsqrind];
-            REAL tmpder = RapidityDerivative(tmpkt, yvals[yind-1]);
             REAL dy = yvals[yind]-yvals[yind-1];
+            REAL tmpder = RapidityDerivative(tmpkt, yvals[yind-1]);
             REAL newn=n[ktsqrind][yind-1] + dy*tmpder;
 
+            // Adams method: apprximate derivative as a 2nd order polynomial
+            // Y_{i+1} = y_i + hf_i + 1/2 h (f_i - f_{i-1} )
+            // We can use this only for yind>1
+            if (yind>1 and adams_method==true)
+            {
+                REAL old_der = derivatives[ktsqrind][yind-2];
+                newn = n[ktsqrind][yind-1] + dy*tmpder
+                    + 1.0/2.0*dy*( tmpder - old_der);
+            }
             
             
             AddDataPoint(ktsqrind, yind, newn, tmpder );
-            if( abs(newn - n[ktsqrind][yind-1])/n[ktsqrind][yind-1] > 0.02)
+            if( abs(newn - n[ktsqrind][yind-1])/n[ktsqrind][yind-1] > 0.1)
             {
                 largedifference++;
             }
