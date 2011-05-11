@@ -6,6 +6,8 @@
 
 #include "config.hpp"
 #include "amplitude.hpp"
+#include "solver_force.hpp"
+#include "solver_chebyshev.hpp"
 #include "tools.hpp"
 #include <gsl/gsl_errno.h>
 #include <cmath>
@@ -34,7 +36,7 @@ enum MODE
 
 int main(int argc, char* argv[])
 {
-    Amplitude N;
+    ChebyshevSolver N;
     REAL minktsqr=DEFAULT_MINKTSQR;
     REAL maxktsqr = DEFAULT_MAXKTSQR;
     REAL ktsqr_mult = DEFAULT_KTSQR_MULTIPLIER;
@@ -52,7 +54,7 @@ int main(int argc, char* argv[])
     string datafile="output";
     int avg=0;
 
-    gsl_set_error_handler(&ErrHandler);
+    //gsl_set_error_handler(&ErrHandler);
 
     OUTPUT output = OUTPUT_FILE;
     string file_prefix="output";
