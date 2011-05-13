@@ -37,6 +37,7 @@ enum MODE
 int main(int argc, char* argv[])
 {
     ChebyshevSolver N;
+    //BruteForceSolver N;
     REAL minktsqr=DEFAULT_MINKTSQR;
     REAL maxktsqr = DEFAULT_MAXKTSQR;
     REAL ktsqr_mult = DEFAULT_KTSQR_MULTIPLIER;

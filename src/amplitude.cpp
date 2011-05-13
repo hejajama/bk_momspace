@@ -27,7 +27,7 @@ Amplitude::Amplitude()
     delta_y = DEFAULT_DELTA_Y;
     averages=0;
     datafile=false;
-    adams_method=false;
+    adams_method=true;
 }
 
 /*
@@ -51,12 +51,12 @@ void Amplitude::Clear()
 void Amplitude::Initialize()
 {
 	Clear();
-    for (unsigned int i=0; i<KtsqrPoints(); i++)
+    for (unsigned int i=0; i<=KtsqrPoints(); i++)
         ktsqrvals.push_back(minktsqr * std::pow(ktsqr_multiplier, (int)i) );
     for (unsigned int i=0; i<YPoints()+1; i++)
         yvals.push_back((REAL) i * delta_y);
     
-    for (unsigned int i=0; i<KtsqrPoints(); i++)   // Intialize every kt
+    for (unsigned int i=0; i<=KtsqrPoints(); i++)   // Intialize every kt
     {
         std::vector<REAL> tmpvec;
         std::vector<REAL> tmpdervec;

@@ -23,6 +23,8 @@ class ChebyshevSolver : public Amplitude
 
     public:
         void Solve(REAL maxy);
+        ChebyshevSolver();
+        ~ChebyshevSolver();
 
     private:
         // \int_0^1 dv f(v) using Chebyshev polynomial approximation
@@ -36,6 +38,11 @@ class ChebyshevSolver : public Amplitude
 
         // L = ln k^2
         REAL minl, maxl;
+
+        // Data structures for cosine transformations
+        int* ipwork;
+        REAL* wwork;
+        REAL* twork;    
 
 
 
