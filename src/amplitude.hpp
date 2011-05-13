@@ -70,9 +70,11 @@ class Amplitude
         REAL DeltaY();
         REAL MinKtsqr();
         REAL MaxKtsqr();
+
+        REAL InitialCondition(REAL ktsqr);  // N() at y=0
         
     protected:
-        REAL InitialCondition(REAL ktsqr);  // N() at y=0
+        
 
         // Values of N as a function of ktsqr and y
         std::vector<REAL> ktsqrvals;

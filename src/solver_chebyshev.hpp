@@ -15,7 +15,7 @@ using std::vector;
  * Chebyshev polynomials
  */
 
-const unsigned int CHEBYSHEV_DEGREE = 40;
+
 
 
 class ChebyshevSolver : public Amplitude
@@ -42,7 +42,8 @@ class ChebyshevSolver : public Amplitude
         // Data structures for cosine transformations
         int* ipwork;
         REAL* wwork;
-        REAL* twork;    
+        REAL* twork;
+        static const unsigned int CHEBYSHEV_DEGREE = 40;
 
 
 

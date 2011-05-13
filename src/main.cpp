@@ -8,6 +8,7 @@
 #include "amplitude.hpp"
 #include "solver_force.hpp"
 #include "solver_chebyshev.hpp"
+#include "chebyshev_amplitude.hpp"
 #include "tools.hpp"
 #include <gsl/gsl_errno.h>
 #include <cmath>
@@ -36,12 +37,11 @@ enum MODE
 
 int main(int argc, char* argv[])
 {
-    ChebyshevSolver N;
+    ChebyshevAmplitudeSolver N;
     //BruteForceSolver N;
     REAL minktsqr=DEFAULT_MINKTSQR;
     REAL maxktsqr = DEFAULT_MAXKTSQR;
     REAL ktsqr_mult = DEFAULT_KTSQR_MULTIPLIER;
-    REAL delta_y = DEFAULT_DELTA_Y;
     REAL y = 0;
     REAL miny = 0.0;
     REAL maxy = 1.0;
@@ -56,8 +56,7 @@ int main(int argc, char* argv[])
     int avg=0;
 
     //gsl_set_error_handler(&ErrHandler);
-
-    OUTPUT output = OUTPUT_FILE;
+    
     string file_prefix="output";
 
     cout << "# " << NAME << " v. " << VERSION << " " << DATE << endl;
