@@ -9,6 +9,7 @@
 #include "config.hpp"
 #include "amplitude.hpp"
 #include <vector>
+#include <gsl/gsl_chebyshev.h>
 #include <cmath>
 
 
@@ -16,9 +17,12 @@
 class ChebyshevAmplitudeSolver : public Amplitude
 {
     public:
+        ChebyshevAmplitudeSolver();
         ~ChebyshevAmplitudeSolver();
         void Solve(REAL maxy);
         void Prepare();
+        REAL Chebyshev(unsigned int n, REAL x);
+        REAL Delta(REAL u, REAL v);
 
         REAL M1();
         REAL M2();
@@ -32,9 +36,9 @@ class ChebyshevAmplitudeSolver : public Amplitude
         std::vector< REAL* > coef;
         REAL m1, m2;    // ln k^2=L, L \in [-M1, M2]
         REAL Ktsqr(REAL u);
-        static const int CHEBYSHEV_ORDER=40;
-
-
+        unsigned int oldn;
+        gsl_cheb_series *cheb;    // Table used in Chebyshev evaluation function
+        static const unsigned int CHEBYSHEV_DEGREE=40;
 
 };
 
