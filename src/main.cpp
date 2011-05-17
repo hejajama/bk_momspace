@@ -10,6 +10,7 @@
 #include "solver_chebyshev.hpp"
 #include "chebyshev_amplitude.hpp"
 #include "tools.hpp"
+#include "chebyshev.hpp"
 #include <gsl/gsl_errno.h>
 #include <cmath>
 #include <fstream>
@@ -36,7 +37,7 @@ enum MODE
 };
 
 int main(int argc, char* argv[])
-{
+{    
     ChebyshevAmplitudeSolver N;
     //BruteForceSolver N;
     REAL minktsqr=DEFAULT_MINKTSQR;
