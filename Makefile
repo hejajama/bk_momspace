@@ -1,5 +1,5 @@
-CXXFLAGS = `gsl-config --cflags` -g -Wall # -I ./libbci-1.1.0/ 
-LDFLAGS = `gsl-config --libs` -lm
+CXXFLAGS = `gsl-config --cflags` -g -Wall -I /linuxfs-home/student/hejajama/lib/include # -I ./libbci-1.1.0/ 
+LDFLAGS = `gsl-config --libs` -lm -L /linuxfs-home/student/hejajama/lib/lib 
 
 SOURCES = src/main.cpp src/amplitude.cpp src/tools.cpp src/datafile.cpp \
 	src/solver_force.cpp src/solver_chebyshev.cpp src/chebyshev_amplitude.cpp 

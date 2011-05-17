@@ -38,7 +38,7 @@ class ChebyshevAmplitudeSolver : public Amplitude
         REAL Ktsqr(REAL u);
         unsigned int oldn;
         gsl_cheb_series *cheb;    // Table used in Chebyshev evaluation function
-        static const unsigned int CHEBYSHEV_DEGREE=40;
+        static const unsigned int CHEBYSHEV_DEGREE=30;
 
 };
 

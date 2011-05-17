@@ -29,8 +29,8 @@ struct Integrand_helper
     ChebyshevAmplitudeSolver* N;
     REAL v;
     REAL y;
-    REAL n;
-    REAL m;
+    unsigned int n;
+    unsigned int m;
 };
 
 REAL Integrand_helperu(REAL v, void* p);
@@ -44,15 +44,22 @@ REAL Integrand_helperv(REAL v, void *p)
     int_helper.params=h;
     REAL result, abserr;
     
-    gsl_integration_workspace *workspace 
+    /*gsl_integration_workspace *workspace 
      = gsl_integration_workspace_alloc(MAXITER_UINT);
-    int status=gsl_integration_qag(&int_helper, -1, 1, 0, UVINTACCURACY, 
+    int status=gsl_integration_qag(&int_helper, -0.999, 0.999, 0, UVINTACCURACY, 
         MAXITER_UINT, GSL_INTEG_GAUSS21, workspace, &result, &abserr);
     gsl_integration_workspace_free(workspace);
+    */
+    
+    gsl_integration_cquad_workspace * workspace =gsl_integration_cquad_workspace_alloc(200);
+    int status=gsl_integration_cquad(&int_helper,-0.999, 0.999, 0, UVINTACCURACY,
+            workspace, &result, &abserr, NULL);
+    gsl_integration_cquad_workspace_free(workspace);
     
     if (status) std::cerr << "Error " << status << " at " << LINEINFO
         << ": Result " << result << ", abserror: " << abserr 
         << " (v=" << v <<")" << endl;
+    //cout << "u integral gave " << result << " at v=" << v << endl;
     return result;
     
     
@@ -62,15 +69,24 @@ REAL Integrand_helperu(REAL u, void* p)
 {
     Integrand_helper* h = (Integrand_helper*) p;
     REAL result=0;
-    REAL n=h->n;
-    REAL m=h->m;
+    unsigned int n=h->n;
+    unsigned int m=h->m;
     REAL v=h->v;
-    if (std::abs(u-v)<eps) return 0.0;  //TODO: CHECK
-    result = h->N->Chebyshev(n, v) - std::exp(h->N->Delta(u,v))*h->N->Chebyshev(n, u);
-    result /= std::abs(exp(h->N->Delta(u,v))-1);
+    REAL m1 = h->N->M1(); REAL m2 = h->N->M2();
+    if (std::abs(u-v)>0.00001)
+    {
+        result = h->N->Chebyshev(n, v) - std::exp(h->N->Delta(u,v))*h->N->Chebyshev(n, u);
+        result /= std::abs(exp(h->N->Delta(u,v))-1);
+    }
+    else
+        result = ( -(m1+m2)*(SQR(v)-1)*std::cos( n*std::acos(v) )
+                + n*std::sqrt(1-SQR(v))*std::sin( n*std::acos(v) ) )
+                / ( (m1+m2)*(SQR(v)-1) );
+    
     result += h->N->Chebyshev(n, u)/std::sqrt(1.0+4.0*std::exp(-2.0*h->N->Delta(u,v)));
     result /= std::sqrt(1.0-SQR(u));
-    
+    result *= h->N->Chebyshev(m, u);
+
     return result;
     
 }
@@ -78,6 +94,7 @@ REAL Integrand_helperu(REAL u, void* p)
 void ChebyshevAmplitudeSolver::Solve(REAL maxy)
 {
     Prepare();
+    REAL alphabar = 0.2;
 
     /* Compute matrix F_{nm}
      * = \int_0^1 dv \int_-1^1 du (1-u^2)^(-1/2) T_m(u) {
@@ -87,8 +104,6 @@ void ChebyshevAmplitudeSolver::Solve(REAL maxy)
      */
 
     Integrand_helper h;
-    h.n=1;
-    h.m=2;
     h.N=this;
     h.y=0;
 
@@ -96,19 +111,86 @@ void ChebyshevAmplitudeSolver::Solve(REAL maxy)
     int_helper.function=&Integrand_helperv;
     int_helper.params=&h;
     REAL result, abserr;
+
+    std::vector< std::vector<REAL> > mat;
+
+    for (unsigned int n=0; n<CHEBYSHEV_DEGREE; n++)
+    {
+        std::vector<REAL> tmpvec;
+        #pragma omp parallel for
+        for (unsigned int m=0; m<CHEBYSHEV_DEGREE; m++)
+        {
+            h.n=n;
+            h.m=m;
     
-    gsl_integration_workspace *workspace 
-     = gsl_integration_workspace_alloc(MAXITER_UINT);
-    int status=gsl_integration_qag(&int_helper, 0, 1, 0, UVINTACCURACY, 
-        MAXITER_UINT, GSL_INTEG_GAUSS21, workspace, &result, &abserr);
-    gsl_integration_workspace_free(workspace);
-    
-    if (status) std::cerr << "Error " << status << " at " << LINEINFO
-        << ": Result " << result << ", abserror: " << abserr << endl;
+            /*gsl_integration_workspace *workspace 
+             = gsl_integration_workspace_alloc(MAXITER_UINT);
+            int status=gsl_integration_qag(&int_helper, 0, 0.999, 0, UVINTACCURACY, 
+                MAXITER_UINT, GSL_INTEG_GAUSS61, workspace, &result, &abserr);
+            gsl_integration_workspace_free(workspace);
+            */
+            gsl_integration_cquad_workspace * workspace =gsl_integration_cquad_workspace_alloc(200);
+            int status =gsl_integration_cquad(&int_helper, 0, 0.999, 0, UVINTACCURACY,
+                workspace, &result, &abserr, NULL);
+            gsl_integration_cquad_workspace_free(workspace);
 
-    cout << result << " pm " << abserr << endl;
+            tmpvec.push_back(result);
+            
+            if (status) std::cerr << "Error " << status << " at " << LINEINFO
+                << ": Result " << result << ", abserror: " << abserr << endl;
+
+            cout << "#F_{" << n << "," << m << "}=" <<result << " relerr " << std::abs(abserr/result) << endl;
+        }
+        mat.push_back(tmpvec);
+    }
+
+    // Evolve up to maxy
+    // Find maxyind corresponding to maxy
+    int maxyind=YPoints();
+    for (unsigned int i=1; i<=YPoints(); i++)
+    {
+        if (yvals[i]>maxy)
+            { maxyind=i; break; }
+    }
 
 
+    // \pi_m \partial y a_m = (M_1+M_2) \alphabar \sum_n a_n f_{nm}
+    for (unsigned int yind=1; yind<maxyind; yind++)
+    {
+        for (unsigned int aind=0; aind < mat.size(); aind++)
+        {
+            REAL newa=0;
+            for (unsigned int tmpind=0; tmpind<mat.size(); tmpind++)
+            {
+                //cout << "coef[" << yind-1 << "][" << tmpind << "]*mat[tmpind][" << aind << endl;
+                newa += coef[yind-1][tmpind]*mat[tmpind][aind];
+            }
+            if (aind==0) newa /= M_PI;
+            else newa /= M_PI/2.0;
+            newa *= (M1()+M2())*alphabar;
+            newa *= yvals[yind]-yvals[yind-1];
+            coef[yind][aind]=newa;
+
+        }
+    }
+
+    ///DEBUG
+    // Tulostetaan kun yind=5
+    gsl_cheb_series *cs = gsl_cheb_alloc (CHEBYSHEV_DEGREE);
+    for (unsigned int i=0; i<=CHEBYSHEV_DEGREE; i++)
+    {        
+        cs->c[i] = coef[5][i];
+    }
+    cs->a=0.0;
+    cs->b=1.0;
+    cs->order=CHEBYSHEV_DEGREE;
+
+    for (unsigned int uind=0; uind<100; uind++)
+    {
+        REAL tmpu = uind/100.0;
+        REAL ktsqr = Ktsqr(tmpu);
+        cout << ktsqr << " " << gsl_cheb_eval(cs, tmpu) << endl;
+    }
 
 };
 
@@ -136,9 +218,9 @@ void ChebyshevAmplitudeSolver::Prepare()
 {
     m1 = -std::log(MinKtsqr());
     m2 = std::log(MaxKtsqr());
-    for (unsigned int yind=0; yind < YPoints(); yind++)
+    for (unsigned int yind=0; yind <= YPoints(); yind++)
     {
-        REAL* tmpc = new REAL[CHEBYSHEV_DEGREE];
+        REAL* tmpc = new REAL[CHEBYSHEV_DEGREE+1];
         coef.push_back(tmpc);
     }
 
@@ -151,7 +233,8 @@ void ChebyshevAmplitudeSolver::Prepare()
 
     gsl_cheb_init(cs, &f, 0.0, 1.0);
 
-    for (unsigned int i=0; i<CHEBYSHEV_DEGREE; i++)
+    
+    for (unsigned int i=0; i<=CHEBYSHEV_DEGREE; i++)
         coef[0][i]=cs->c[i];
 
     gsl_cheb_free(cs);
@@ -172,10 +255,12 @@ ChebyshevAmplitudeSolver::~ChebyshevAmplitudeSolver()
 ChebyshevAmplitudeSolver::ChebyshevAmplitudeSolver()
 {
     cheb = gsl_cheb_alloc (CHEBYSHEV_DEGREE);
+    cheb->c = new REAL[CHEBYSHEV_DEGREE+1];
     cheb->a=-1.0; cheb->b=1.0;
     for (unsigned int i=1; i<=CHEBYSHEV_DEGREE; i++)
         cheb->c[i]=0;
     cheb->c[0]=2.0;
+    oldn=0;
     
 }
 
@@ -192,7 +277,7 @@ REAL ChebyshevAmplitudeSolver::M2()
 REAL ChebyshevAmplitudeSolver::Ktsqr(REAL u)
 {
     // Comput ktsqr from u
-    return std::exp( (m1+m2)*u - m1 );
+    return std::exp( (M1()+M2())*u - M1() );
 }
 
 /*
@@ -208,7 +293,6 @@ REAL ChebyshevAmplitudeSolver::Chebyshev(unsigned int n, REAL x)
     }
     if (oldn==n)
         return gsl_cheb_eval(cheb, x);
-    
     cheb->c[oldn]=0.0;
     if (n==0)
     {
@@ -218,7 +302,7 @@ REAL ChebyshevAmplitudeSolver::Chebyshev(unsigned int n, REAL x)
     {
         cheb->c[n]=1.0;
     }
-    
+
     REAL result = gsl_cheb_eval_n(cheb, n, x);
     oldn=n;
     return result;
@@ -228,5 +312,5 @@ REAL ChebyshevAmplitudeSolver::Chebyshev(unsigned int n, REAL x)
 
 REAL ChebyshevAmplitudeSolver::Delta(REAL u, REAL v)
 {
-    return (m1+m2)*(u-v);    
+    return (M1()+M2())*(u-v);    
 }

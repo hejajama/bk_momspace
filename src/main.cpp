@@ -152,8 +152,6 @@ int main(int argc, char* argv[])
         return -1;
     }
     N.Initialize();
-    
-    cout << N.Chebyshev(1,0.5) << " "<< N.Chebyshev(5,-0.1) << endl;
 
 	std::stringstream infostr;
     std::ofstream output_data;
