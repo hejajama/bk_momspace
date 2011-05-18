@@ -37,7 +37,14 @@ enum MODE
 };
 
 int main(int argc, char* argv[])
-{    
+{
+    ChebyshevVector a(3),b(3), c(3);
+    a.SetComponent(1,1); a.SetComponent(3,1);
+    b.SetComponent(1,1);
+    cout << a.DotProduct(b) << endl;
+    c=  b-a;
+    cout << c << endl;
+        
     ChebyshevAmplitudeSolver N;
     //BruteForceSolver N;
     REAL minktsqr=DEFAULT_MINKTSQR;

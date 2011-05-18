@@ -17,21 +17,32 @@
 #include "config.hpp"
 #include <gsl/gsl_chebyshev.h>
 #include <vector>
+#include <iostream>
 
-class ChebyshevBasis
+class ChebyshevVector
 {
     public:
-        ChebyshevBasis(unsigned int d);
+        ChebyshevVector(unsigned int d);
         REAL Component(unsigned int n);
-        REAL InnerProduct(ChebyshevBasis &vec);
+        REAL DotProduct(ChebyshevVector &vec);
+        // Dot product with an arbitrary function
+        REAL DotProduct( REAL(*f)(REAL x, void* p), void* p );
         REAL Evaluate(REAL x);
         void SetComponent(unsigned int c, REAL val);
+        void Normalize();
 
+        ChebyshevVector operator+(ChebyshevVector &v);
+        ChebyshevVector operator-(ChebyshevVector &v);
+        ChebyshevVector& operator*(REAL x);
+        ChebyshevVector& operator=(ChebyshevVector v);
 
+        unsigned int Degree();
     private:
         unsigned int degree;
         gsl_cheb_series *cheb;
 
 };
+
+std::ostream& operator<<(std::ostream& os, ChebyshevVector& v);
 
 #endif
