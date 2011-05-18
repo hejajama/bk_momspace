@@ -36,7 +36,7 @@ class ChebyshevAmplitudeSolver : public Amplitude
         // Chebyshev polynomial coefficients, vector index is yind
         // Each pointer points to an array with CHEBYSHEV_ORDER numbers
         // This for so it is efficient to use with GSL
-        std::vector< REAL* > coef;
+        std::vector< std::vector<REAL> > coef;
 
         // Basis vectors
         std::vector< ChebyshevVector > basis;
@@ -46,7 +46,7 @@ class ChebyshevAmplitudeSolver : public Amplitude
         
         unsigned int oldn;
         gsl_cheb_series *cheb;    // Table used in Chebyshev evaluation function
-        static const unsigned int CHEBYSHEV_DEGREE=5;
+        static const unsigned int CHEBYSHEV_DEGREE=40;
         
 
 };

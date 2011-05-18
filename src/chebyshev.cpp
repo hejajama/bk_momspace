@@ -62,10 +62,10 @@ REAL ChebyshevVector::DotProduct(REAL(*f)(REAL x, void* p), void* p)
     gsl_function int_helper;
     int_helper.function=&Inthelperf_innerprod;
     int_helper.params=&helper;
-    REAL result, abserr;
+    REAL result, result2, abserr;
 
-    gsl_integration_cquad_workspace * workspace =gsl_integration_cquad_workspace_alloc(200);
-    int status =gsl_integration_cquad(&int_helper, -1, 1, 0, INNERPROD_ACCURACY,
+    gsl_integration_cquad_workspace * workspace =gsl_integration_cquad_workspace_alloc(500);
+    int status =gsl_integration_cquad(&int_helper, -1.0, 1.0, 0, INNERPROD_ACCURACY,
          workspace, &result, &abserr, NULL);
     gsl_integration_cquad_workspace_free(workspace);
 
@@ -108,6 +108,17 @@ ChebyshevVector::ChebyshevVector(unsigned int d)
         SetComponent(i,0);
 }
 
+ChebyshevVector::ChebyshevVector(std::vector<REAL> vec)
+{
+    degree=vec.size()+1;
+    cheb = gsl_cheb_alloc(degree);
+    cheb->a=-1.0;
+    cheb->b=1.0;
+    cheb->order=degree;
+    for (unsigned int i=0; i<=degree; i++)
+        SetComponent(i, vec[i]);
+}
+
 void ChebyshevVector::SetComponent(unsigned int c, REAL val)
 {
     if (c>degree)
@@ -137,6 +148,13 @@ REAL ChebyshevVector::Component(unsigned int c)
 unsigned int ChebyshevVector::Degree()
 {
     return degree;
+}
+
+void ChebyshevVector::SetLimits(REAL a, REAL b)
+{
+    cheb->a=a;
+    cheb->b=b;   
+
 }
 
 ///// Operators

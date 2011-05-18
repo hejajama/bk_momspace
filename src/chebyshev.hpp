@@ -23,6 +23,8 @@ class ChebyshevVector
 {
     public:
         ChebyshevVector(unsigned int d);
+        ChebyshevVector(std::vector<REAL> vec);
+        void SetLimits(REAL a, REAL b);
         REAL Component(unsigned int n);
         REAL DotProduct(ChebyshevVector &vec);
         // Dot product with an arbitrary function

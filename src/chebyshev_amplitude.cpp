@@ -26,11 +26,10 @@ const REAL UVINTACCURACY=0.001;
 enum BASIS_BOUNDARY_CONDITION
 {
     CHEBYSHEV,
-    CHEBYSHEV_ZERO1,        // Chebyshevs which are 0 at x=1
-    CHEBYSHEV_ZERO2         // Chebyshevs which are 0 at x=\pm 1
+    CHEBYSHEV_ZERO,        // Chebyshevs which are 0 at x=1
 };
 
-const BASIS_BOUNDARY_CONDITION BC=CHEBYSHEV; //_ZERO2;
+const BASIS_BOUNDARY_CONDITION BC=CHEBYSHEV_ZERO;
 
 
 
@@ -103,7 +102,7 @@ REAL Integrand_helperu(REAL u, void* p)
 
 void ChebyshevAmplitudeSolver::Solve(REAL maxy)
 {
-    Prepare();
+    Prepare(); exit(1);
     REAL alphabar = 0.2;
 
     /* Compute matrix F_{nm}
@@ -222,11 +221,19 @@ void ChebyshevAmplitudeSolver::Prepare()
 {
     m1 = -std::log(MinKtsqr());
     m2 = std::log(MaxKtsqr());
+
+    m1=0;   // => v \in [-1,1]
+    
     for (unsigned int yind=0; yind <= YPoints(); yind++)
     {
-        REAL* tmpc = new REAL[CHEBYSHEV_DEGREE+1];
-        coef.push_back(tmpc);
+        std::vector<REAL> tmpvec;
+        for (unsigned int i=0; i<=CHEBYSHEV_DEGREE; i++)
+        {
+            tmpvec.push_back(0.0);
+        }
+        coef.push_back(tmpvec);
     }
+    ComputeBasisVectors();
 
     // Compute initial condition function expansion in the specified basis
     ICHelper help; help.N=this;
@@ -237,34 +244,24 @@ void ChebyshevAmplitudeSolver::Prepare()
         coef[0][i] = basis[i].DotProduct(ICHelperf, &help);
     }
 
-    /*switch(BC)
+    // Test....
+    gsl_cheb_series *series = gsl_cheb_alloc (CHEBYSHEV_DEGREE);
+    gsl_function f; f.function=ICHelperf; f.params=&help;
+    gsl_cheb_init (series, &f, -1.0, 1.0);
+
+
+    for (int i=-100; i<100; i++)
     {
-    case CHEBYSHEV:
-    {
+        REAL x = i/100.0;
+        REAL ktsqr=Ktsqr(x);
+        REAL newbasis=0;
+        for (unsigned int d=0; d<=CHEBYSHEV_DEGREE; d++)
+            newbasis += coef[0][d]*basis[d].Evaluate(x);
+        cout << ktsqr << " " << InitialCondition(ktsqr) << " "
+            << newbasis << " "<< gsl_cheb_eval(series, x) << endl;
 
-        gsl_cheb_series *cs = gsl_cheb_alloc (CHEBYSHEV_DEGREE);
-        ICHelper help;
-        help.N=this;
-        gsl_function f;
-        f.function = ICHelperf;
-        f.params=&help;
-
-        gsl_cheb_init(cs, &f, 0.0, 1.0);
-
-        
-        for (unsigned int i=0; i<=CHEBYSHEV_DEGREE; i++)
-            coef[0][i]=cs->c[i];
-
-        gsl_cheb_free(cs);
-        break;
     }
-    case CHEBYSHEV_ZERO1:
-    case CHEBYSHEV_ZERO2:
-        while(0){}
-        
-    }*/
-
-    ComputeBasisVectors();
+    
 
 }
 
@@ -277,23 +274,22 @@ void ChebyshevAmplitudeSolver::ComputeBasisVectors()
     // Make the basis orthonormal by Gram-Schmidt process
 
     switch(BC)
-    {
-    case CHEBYSHEV_ZERO2:
+    {        
+    case CHEBYSHEV_ZERO:
         {
-        // Boundary condition: T_n(1)=0 and T_n(-1)=0
+        // Boundary condition: T_n(1)=0
+        basis.clear();
         ChebyshevVector v0(CHEBYSHEV_DEGREE);
-        v0.SetComponent(2,1); v0.SetComponent(0,-1);    // T_2 -1
-        v0.Normalize();
         basis.push_back(v0);
-        cout << "Basis vector 0:" << v0 << endl;
-        for (unsigned int j=3; j<=CHEBYSHEV_DEGREE; j++)
+        ChebyshevVector(v1)(CHEBYSHEV_DEGREE);
+        v1.SetComponent(1,1.0); v1.SetComponent(0,-1.0);    // T_1 -1
+        v1.Normalize();
+        basis.push_back(v1);
+        for (unsigned int j=2; j<=CHEBYSHEV_DEGREE; j++)
         {
             ChebyshevVector tmpvec(CHEBYSHEV_DEGREE);
-            tmpvec.SetComponent(j, 1);
-            if (GSL_IS_ODD(j))
-                tmpvec.SetComponent(1,-1);
-            else
-                tmpvec.SetComponent(0,1);
+            tmpvec.SetComponent(j, 1.0);
+            tmpvec.SetComponent(0, -1.0);
 
             // Remove components in the directions of basis vectors
             for (unsigned int i=0; i<basis.size(); i++)
@@ -305,7 +301,7 @@ void ChebyshevAmplitudeSolver::ComputeBasisVectors()
                 tmpvec = tmpvec - comp;
             }
             tmpvec.Normalize();
-            cout << "Basis vector " << j-2 <<": " << tmpvec << endl;
+            //cout << "Basis vector " << j-2 <<": " << tmpvec << endl;
             basis.push_back(tmpvec);
         }
         }
@@ -344,10 +340,7 @@ REAL ChebyshevAmplitudeSolver::Basis(unsigned int n, REAL x)
 
 ChebyshevAmplitudeSolver::~ChebyshevAmplitudeSolver()
 {
-    for (unsigned int yind=0; yind<YPoints(); yind++)
-    {
-        delete[] coef[yind];
-    }
+
     gsl_cheb_free(cheb);
 
 }

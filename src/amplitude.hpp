@@ -15,7 +15,7 @@ const REAL DEFAULT_DELTA_Y=0.2;
 const unsigned int DEFAULT_MAXY=50;
 const REAL DEFAULT_KTSQR_MULTIPLIER = 1.01;  // ktsqr_{i+1} = ktsqr_i*KTSQR_MULTIPLIER
 //const REAL DEFAULT_KTSQR_MULTIPLIER = 1.05;
-const REAL DEFAULT_MINKTSQR = 1e-7; // orig: 1e-8
+const REAL DEFAULT_MINKTSQR = 1e-8; // orig: 1e-8
 const REAL DEFAULT_MAXKTSQR = 1e10; // orig: 1e10
 
 //const unsigned int POINTS_Y= (int)(MAXY/DELTA_Y);
