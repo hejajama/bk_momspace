@@ -38,7 +38,7 @@ class Amplitude
         Amplitude();
         void Initialize();
 		void Clear();
-        REAL N(REAL ktsqr, REAL y);
+        virtual REAL N(REAL ktsqr, REAL y);
         
         REAL LogLogDerivative(REAL ktsqr, REAL y);
 

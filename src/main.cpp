@@ -39,6 +39,8 @@ enum MODE
 int main(int argc, char* argv[])
 {        
     ChebyshevAmplitudeSolver N;
+    N.SetChebyshevDegree(200);
+    N.SetBoundaryCondition(CHEBYSHEV_ZERO);
     //BruteForceSolver N;
     REAL minktsqr=DEFAULT_MINKTSQR;
     REAL maxktsqr = DEFAULT_MAXKTSQR;
@@ -56,7 +58,7 @@ int main(int argc, char* argv[])
     string datafile="output";
     int avg=0;
 
-    //gsl_set_error_handler(&ErrHandler);
+    gsl_set_error_handler(&ErrHandler);
     
     string file_prefix="output";
 

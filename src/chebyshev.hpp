@@ -16,14 +16,19 @@
 
 #include "config.hpp"
 #include <gsl/gsl_chebyshev.h>
+#include <gsl/gsl_integration.h>
 #include <vector>
 #include <iostream>
 
 class ChebyshevVector
 {
     public:
+        ChebyshevVector();
         ChebyshevVector(unsigned int d);
         ChebyshevVector(std::vector<REAL> vec);
+        //ChebyshevVector(ChebyshevVector v);
+        ~ChebyshevVector();
+        void Initialize();
         void SetLimits(REAL a, REAL b);
         REAL Component(unsigned int n);
         REAL DotProduct(ChebyshevVector &vec);
@@ -42,6 +47,7 @@ class ChebyshevVector
     private:
         unsigned int degree;
         gsl_cheb_series *cheb;
+        gsl_integration_qaws_table* table;
 
 };
 

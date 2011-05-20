@@ -10,7 +10,7 @@
 #include <cmath>
 #include <sstream>
 
-const unsigned int MAXITER_INNERPROD = 1000;
+const unsigned int MAXITER_INNERPROD = 10000;
 const REAL INNERPROD_ACCURACY = 0.0001;
 
 /*
@@ -48,7 +48,7 @@ struct Inthelper_innerprod
 REAL Inthelperf_innerprod(REAL x, void* p)
 {
     Inthelper_innerprod *par = (Inthelper_innerprod*) p;
-    return 1.0/std::sqrt(1.0-SQR(x))*par->a->Evaluate(x)* (*(par->f))(x, par->p);
+    return par->a->Evaluate(x)* (*(par->f))(x, par->p);
 }
 
 REAL ChebyshevVector::DotProduct(REAL(*f)(REAL x, void* p), void* p)
@@ -62,13 +62,32 @@ REAL ChebyshevVector::DotProduct(REAL(*f)(REAL x, void* p), void* p)
     gsl_function int_helper;
     int_helper.function=&Inthelperf_innerprod;
     int_helper.params=&helper;
-    REAL result, result2, abserr;
+    REAL result, abserr;
 
-    gsl_integration_cquad_workspace * workspace =gsl_integration_cquad_workspace_alloc(500);
+    // Weight function (1-x^2)^(-1/2) = [ (1-x)*(1+x) ]^(-1/2)
+    // -> (x-a)^\alpha (b-x)^\beta \log^\mu (x-a) \log^\nu (b-x) weight function,
+    // a=-1, b=1 => \alpha=-1/2, \beta=-1/2, \mu=0, \nu=0
+    gsl_integration_workspace* workspace = gsl_integration_workspace_alloc(MAXITER_INNERPROD);
+
+    ///TODO: Intialize table only once!
+    table = gsl_integration_qaws_table_alloc( -0.5, -0.5, 0, 0);
+    int status = gsl_integration_qaws( &int_helper, -1.0, 1.0, table,
+        0, INNERPROD_ACCURACY, MAXITER_INNERPROD, workspace, &result, &abserr);
+    if (status and (std::abs(result)>1e-14 or std::abs(result)/abserr > 100) )
+    {
+        cerr << "Error " << status << " at innerprod, result "
+        << result << " relerr " << std::abs(abserr)/result
+        << " at " << LINEINFO << endl;
+    }
+    gsl_integration_qaws_table_free(table);
+    /*gsl_integration_cquad_workspace * workspace =gsl_integration_cquad_workspace_alloc(10000);
     int status =gsl_integration_cquad(&int_helper, -1.0, 1.0, 0, INNERPROD_ACCURACY,
          workspace, &result, &abserr, NULL);
     gsl_integration_cquad_workspace_free(workspace);
+    */
 
+    
+    gsl_integration_workspace_free(workspace);
     return result;    
 
 
@@ -100,23 +119,64 @@ ChebyshevVector::ChebyshevVector(unsigned int d)
 {
     degree = d;
     cheb = gsl_cheb_alloc (degree);
-    cheb->a=-1.0;
-    cheb->b=1.0;
     cheb->order=degree;
 
     for (unsigned int i=0; i<=d; i++)
         SetComponent(i,0);
+    Initialize();
 }
 
 ChebyshevVector::ChebyshevVector(std::vector<REAL> vec)
 {
     degree=vec.size()+1;
     cheb = gsl_cheb_alloc(degree);
-    cheb->a=-1.0;
-    cheb->b=1.0;
     cheb->order=degree;
     for (unsigned int i=0; i<=degree; i++)
         SetComponent(i, vec[i]);
+    Initialize();
+}
+/*
+ChebyshevVector::ChebyshevVector(ChebyshevVector v)
+{
+    degree=v.Degree();
+    cheb = gsl_cheb_alloc(degree);
+    cheb->order=degree;
+    for (unsigned int i=0; i<=degree; i++)
+        SetComponent(i, v.Component(i));
+    Initialize();
+    cout << "ChebyshevVector constructor called :OOOO\n";
+
+}*/
+
+ChebyshevVector::ChebyshevVector()
+{
+    cerr << "Chebyshev intialized without any parameters, don't know what"
+        << " to do " << endl;
+    Initialize();
+}
+
+void ChebyshevVector::Initialize()
+{
+    // Weight function for dot products (1-x^2)^(-1/2) = [ (1-x)*(1+x) ]^(-1/2)
+    // -> (x-a)^\alpha (b-x)^\beta \log^\mu (x-a) \log^\nu (b-x) weight function,
+    // a=-1, b=1 => \alpha=-1/2, \beta=-1/2, \mu=0, \nu=0
+    //table = gsl_integration_qaws_table_alloc( -0.5, -0.5, 0, 0);
+    cheb->a=-1.0;
+    cheb->b=1.0;
+    
+}
+
+ChebyshevVector::~ChebyshevVector()
+{
+   /* cout << "Freeing table\n";
+    if (table!=NULL)
+    {
+        gsl_integration_qaws_table_free(table);
+        table=NULL;
+    }
+    else
+        cout << "It was null :o" << endl;
+    */
 }
 
 void ChebyshevVector::SetComponent(unsigned int c, REAL val)
@@ -186,9 +246,12 @@ ChebyshevVector ChebyshevVector::operator-(ChebyshevVector &vec)
     return tmpvec;
 
 }
+
 ChebyshevVector& ChebyshevVector::operator=(ChebyshevVector vec)
 {
-    if (Degree() != vec.Degree())
+    if (&vec == this) return *this;
+    REAL d = vec.Degree();
+    if (Degree() != d)
     {
         cerr << "Dimensio mismatch at " << LINEINFO << endl;
     }

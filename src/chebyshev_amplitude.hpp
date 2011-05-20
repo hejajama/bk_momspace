@@ -13,6 +13,11 @@
 #include <gsl/gsl_chebyshev.h>
 #include <cmath>
 
+enum BASIS_BOUNDARY_CONDITION
+{
+    CHEBYSHEV,
+    CHEBYSHEV_ZERO,        // Chebyshevs which are 0 at x=1
+};
 
 
 class ChebyshevAmplitudeSolver : public Amplitude
@@ -25,10 +30,17 @@ class ChebyshevAmplitudeSolver : public Amplitude
         REAL Chebyshev(unsigned int n, REAL x);
         REAL Delta(REAL u, REAL v);
         REAL Basis(unsigned int n, REAL x);     // Evaluate ith basis function
+        ChebyshevVector& BasisVector(unsigned int n); // Poitner to nth basis vec
+
+        REAL N(REAL ktsqr, REAL y);
 
         REAL M1();
         REAL M2();
         REAL Ktsqr(REAL u);
+        REAL U(REAL ktsqr);
+
+        void SetChebyshevDegree(unsigned int d);
+        void SetBoundaryCondition(BASIS_BOUNDARY_CONDITION bc);
         
 
 
@@ -46,8 +58,10 @@ class ChebyshevAmplitudeSolver : public Amplitude
         
         unsigned int oldn;
         gsl_cheb_series *cheb;    // Table used in Chebyshev evaluation function
-        static const unsigned int CHEBYSHEV_DEGREE=40;
-        
+        gsl_integration_qaws_table* qaws_table;
+        unsigned int chebyshev_degree;
+        static const unsigned int DEFAULT_CHEBYSHEV_DEGREE=40;
+        BASIS_BOUNDARY_CONDITION boundary_condition;
 
 };
 
