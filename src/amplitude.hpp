@@ -38,18 +38,20 @@ class Amplitude
         Amplitude();
         void Initialize();
 		void Clear();
+
+        // Notice: N is virtual, so subclasses may use their own methods
+        // to compute the amplitude (e.g. ChebyshevAmplitudeSolver), and
+        // in that case they may not use n[][]-table or AddDataPoint-routines
+        // at all!
         virtual REAL N(REAL ktsqr, REAL y);
+        void AddDataPoint(int ktsqrindex, int yindex, REAL value, REAL der);
         
         REAL LogLogDerivative(REAL ktsqr, REAL y);
 
-        void AddDataPoint(int ktsqrindex, int yindex, REAL value, REAL der);
-
         int ReadData(string file);
-
-        void Interpolate();
+        
 
         virtual void Solve(REAL maxy)=0;
-        void SolveGSL(REAL maxy);
 
         REAL Ktsqrval(unsigned int i);
         REAL Yval(unsigned int i);
@@ -74,13 +76,11 @@ class Amplitude
         REAL InitialCondition(REAL ktsqr);  // N() at y=0
         
     protected:
-        
-
-        // Values of N as a function of ktsqr and y
-        std::vector<REAL> ktsqrvals;
-        std::vector<REAL> yvals;
         // n[ktsqr][y]
         std::vector< std::vector<REAL> > n;
+
+        std::vector<REAL> ktsqrvals;
+        std::vector<REAL> yvals;
 
         // derivatives
         std::vector< std::vector<REAL> > derivatives;

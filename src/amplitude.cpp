@@ -145,9 +145,6 @@ REAL Amplitude::N(REAL ktsqr, REAL y)
     REAL *tmpxarray = new REAL[interpo_points];
     for (int i=interpolation_start; i<= interpolation_end; i++)
     {
-       // if (ktsqrind == 2734)
-       //     cout << "Setting tmpxarray[" << i-interpolation_start << " to "
-       // <<ktsqrvals[i] << ", i=" << i << " ktsqr=" << ktsqr << endl;
 		tmpxarray[i-interpolation_start]=ktsqrvals[i];
 		
 		if (n[ktsqrind][yind+1]>-eps and y-yvals[yind]>eps)
@@ -158,10 +155,6 @@ REAL Amplitude::N(REAL ktsqr, REAL y)
 		else
 			tmparray[i-interpolation_start] = n[i][yind];
     }
-
-    if (interpolation_start>2000 and tmpxarray[0]<1)
-        cerr <<"tmpxarray[0]=" << tmpxarray[0] << " at y="<<y<< ", ktsqr=" << ktsqr
-        << " ktsqrind=" << ktsqrind << ", interpolation_start: " << interpolation_start << endl;
     
     gsl_interp_accel *acc = gsl_interp_accel_alloc();
     gsl_spline *spline = gsl_spline_alloc(gsl_interp_cspline, interpo_points);
@@ -197,16 +190,6 @@ REAL Amplitude::N(REAL ktsqr, REAL y)
 }
 
 /*
- * Interpolate
- * TODO, or remove completely?
- */
-void Amplitude::Interpolate()
-{
-    
-
-}
-
-/*
  * Add computed data point, e.g. N(ktsqr, y), where ktsqr=ktsqrvals[ktsqrindex]
  * etc. der is \partial_Y N( ktsqr, yvals[yindex-1] ), e.g. the rapidity
  * derivative used to compute value
@@ -236,122 +219,6 @@ void Amplitude::AddDataPoint(int ktsqrindex, int yindex, REAL value, REAL der)
         cerr << "Added data point with yindex=" << yindex << " " << LINEINFO << endl;
 }
 
-
-
-/*
- * Solve BK using GSL ODE solver
- */
- 
-
-/*
- * Defines the equation for use in the ODE solver
- * t: "time"=rapidity, y[] = table of the amplitude values got in
- * previous iteration, f[] = table where to save new values of dy/dt = dN/dy,
- * params = other parameters
- */
-
-struct inthelper_gslsolve
-{
-    REAL ktsqr;
-    REAL* n;
-};
-
-REAL inthelperf_gslsolve( REAL ktsqr, void* p)
-{
-
-    return 0;
-}
-
-int func(double t, const double y[], double f[], void *params)
-{
-    double dummy1; 
-    void * dummy2; 
-    dummy1 =t;   // We don't need these
-    dummy2 =params;
-
-    inthelper_gslsolve inthelp;
-    int *dim = (int*) params;
-    inthelp.n = new REAL[(*dim)];
-    for (int i=0; i< (*dim); i++)
-        inthelp.n[i]=y[i];
-
-    //Compute rapidity derivatives
-    for (int i=0; i<(*dim); i++)
-    {
-        gsl_function fun;
-        fun.params=&inthelp;
-        fun.function = inthelperf_gslsolve;
-
-        REAL result, abserr; 
-        gsl_integration_workspace *workspace 
-         = gsl_integration_workspace_alloc(KTSQRINTITERATIONS); 
-        int status=gsl_integration_qag(&fun, 1e-8, 1e8, 0, KTSQRINTACCURACY, 
-            KTSQRINTITERATIONS, GSL_INTEG_GAUSS21, workspace, &result, &abserr);
-        gsl_integration_workspace_free(workspace);
-
-        f[i] = 0.2*(result - y[i]*y[i]);
-    }
-
-   /*
-   for( i=0 ; i<=uvMax ; i++) {
-      ws[i] = y[i];
-   }
-   for( i=0 ; i<=uvMax ; i++) {
-      f[i] = abar[i] * cheb_approx(i);
-   }*/
-   return GSL_SUCCESS;
-}
-
-
-void Amplitude::SolveGSL(REAL maxy)
-{
-    const gsl_odeiv_step_type * T = gsl_odeiv_step_rkf45;
-    gsl_odeiv_step * s    = gsl_odeiv_step_alloc (T, KtsqrPoints());
-    gsl_odeiv_control * c = gsl_odeiv_control_y_new (0.1, 0.0);
-    gsl_odeiv_evolve * e  = gsl_odeiv_evolve_alloc (KtsqrPoints());
-
-    int dim = KtsqrPoints();
-    gsl_odeiv_system sys = {func, NULL, KtsqrPoints(), &dim};
-
-    REAL* phi = new REAL[KtsqrPoints()];
-    for (unsigned int i=0; i<KtsqrPoints(); i++)
-    {
-        phi[i]=n[i][0];
-    }
-
-    // Find maxyind corresponding to maxy
-    int maxyind=YPoints();
-    for (unsigned int i=1; i<=YPoints(); i++)
-    {
-        if (yvals[i]>maxy)
-            { maxyind=i; break; }
-    }
-
-    for (int yind=1; yind <= maxyind; yind++)
-    {
-        REAL Y=0;
-        REAL tmpy=yvals[yind];
-        REAL h = yvals[yind]-yvals[yind-1];
-        while( Y < tmpy)
-        {
-            int status = gsl_odeiv_evolve_apply(e, c, s, &sys,
-                &Y, tmpy, &h, phi);
-            if (status != GSL_SUCCESS)
-            {
-                cerr << "Error at " << LINEINFO << ": code " << status << endl;
-            }
-            yvals[yind]=Y;
-            for (unsigned int i=0; i<KtsqrPoints(); i++)
-                n[yind][i] = phi[i];
-
-        }
-
-    }
-
-    delete[] phi;
-
-
-}
 
 /*
  * d ln N(ktsqr) / d ln(ktsqr) = d ktsqr / d ln Ktsqr d ln N(ktsqr) /d ktsqr

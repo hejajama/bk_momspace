@@ -225,7 +225,6 @@ void BruteForceSolver::Solve(REAL maxy)
 
 }
 
-
 BruteForceSolver::BruteForceSolver()
 {
 

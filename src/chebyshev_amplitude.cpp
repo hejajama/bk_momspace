@@ -320,6 +320,8 @@ void ChebyshevAmplitudeSolver::Solve(REAL maxy)
     // \partial y a_m = (M_1+M_2) \alphabar \sum_n a_n f_{nm}
     for (unsigned int yind=1; yind<maxyind; yind++)
     {
+        cerr << "# y=" << yvals[yind] << endl;
+        #pragma omp parallel for
         for (unsigned int aind=0; aind < mat.size(); aind++)
         {
             REAL dera=0;
@@ -333,32 +335,6 @@ void ChebyshevAmplitudeSolver::Solve(REAL maxy)
             coef[yind][aind]=coef[yind-1][aind] + (yvals[yind]-yvals[yind-1])*dera;
 
         }
-    }
-
-    ///DEBUG
-    // Tulostetaan kun yind=5
-    gsl_cheb_series *cs = gsl_cheb_alloc (chebyshev_degree);
-    for (unsigned int i=0; i<=chebyshev_degree; i++)
-    {        
-        cs->c[i] = coef[0][i];
-    }
-    cs->a=0.0;
-    cs->b=1.0;
-    cs->order=chebyshev_degree;
-
-    for (int uind=-100; uind<100; uind++)
-    {
-        REAL tmpu = uind/100.0;
-        REAL ktsqr = Ktsqr(tmpu);
-        REAL amp=0; REAL amp2=0; REAL amp3=0;
-        for (unsigned int d=0; d<=chebyshev_degree; d++)
-        {
-            amp += coef[0][d]*basis[d].Evaluate(tmpu);
-            amp2 += coef[1][d]*basis[d].Evaluate(tmpu);
-            amp3 += coef[5][d]*basis[d].Evaluate(tmpu);
-        }
-        
-        cout << ktsqr << " " << amp << " " << amp2 << " " << amp3 << endl;
     }
 
 };
@@ -570,26 +546,60 @@ void ChebyshevAmplitudeSolver::ComputeBasisVectors()
  * N
  * Evaluate the scattering amplitude at given ktsqr and y
  * So evaluates the amplitude in the basis used
- * Interpolates between rapiditeis somehow (TODO)
+ * Interpolates between rapidites linearly (TODO: spline?)
+ * Or interpolate coefficients?
  */
 REAL ChebyshevAmplitudeSolver::N(REAL ktsqr, REAL y)
 {
-    REAL yind=0;    ///TODO
+    // Find yind
+    // val[index]  is smaller than (or equal) y
+    int yind=-1;
+    for (unsigned int i=0; i<yvals.size()-1; i++)
+    {
+        if (yvals[i]<=y and yvals[i+1]>y)
+        {
+            yind=i;
+            break;
+        }
+    }
+    if (yind<0)
+        yind=yvals.size()-1;
+        
     REAL u = U(ktsqr);
 
-    // Efective coefficients (interpolate with spline?)
-    REAL cf[chebyshev_degree+1];
+    // Interpolate linearly
+
+    REAL cf0[chebyshev_degree+1];   // at lower rapidity
+    REAL cf1[chebyshev_degree+1];   // at higher rapidity
     for (unsigned int i=0; i<=chebyshev_degree; i++)
-    {
-        cf[i] = coef[0][i];
+    {        
+        // interpolate coefficients:
+        cf0[i] = coef[yind][i];
+        if (yind < yvals.size()-1)
+            cf1[i] = coef[yind+1][i];   
     }
 
-    REAL result=0;
+    REAL n0=0; REAL n1=0;
     for (unsigned int i=0; i<=chebyshev_degree; i++)
     {
-        result += cf[i]*Basis(i, u);
+        n0 += cf0[i]*Basis(i, u);
+        n1 += cf1[i]*Basis(i,u);
     }
-    return result;
+
+    // Interpolate
+    if (y - yvals[yind] < 0.00001)  // Don't interpolate
+        return n0;
+    if (yind >= yvals.size()-1) // Extrapolate
+    {
+        cerr << "Should extrapolate, as y=" << y<<" , falling back to y=" <<
+        yvals[yvals.size()-1] << endl;
+        return n1;
+    }
+    else
+    {
+        return n0 + (y-yvals[yind])*(n1-n0)/(yvals[yind+1]-yvals[yind]);
+    }
+    
 }
 
 

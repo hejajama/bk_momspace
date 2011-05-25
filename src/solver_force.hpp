@@ -17,11 +17,12 @@ class BruteForceSolver : public Amplitude
     public:
         void Solve(REAL maxy);
         REAL RapidityDerivative(REAL ktsqr, REAL y);
+        
 
         BruteForceSolver();
         ~BruteForceSolver();
     private:
-        
+
 
 
 };

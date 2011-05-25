@@ -55,7 +55,7 @@ REAL maxktsqr = DEFAULT_MAXKTSQR;
 REAL ktsqr_mult = DEFAULT_KTSQR_MULTIPLIER;
 REAL y = 0;
 REAL miny = 0.0;
-REAL maxy = 1.0;
+REAL maxy = 0.0;
 REAL maxdatay = -1;
 REAL delta_datay = 1;
 REAL y_points = 10;
@@ -84,7 +84,11 @@ void LogLogDerivative();
 
 int main(int argc, char* argv[])
 {
-
+    // Print the cmdline args
+    cout << "# ";
+    for (int i=0; i<argc; i++)
+        cout << argv[i] << " " ;
+    cout << endl;
 
     gsl_set_error_handler(&ErrHandler);
 
@@ -140,11 +144,13 @@ int main(int argc, char* argv[])
         else if (string(argv[i])=="-load_matrix")
         {
             cheb_matrix = LOAD;
+            method = CHEBYSHEV_SERIES;  // Implicitly clear
             matrixfile = argv[i+1];
         }
         else if (string(argv[i])=="-save_matrix")
         {
             cheb_matrix = SAVE;
+            method = CHEBYSHEV_SERIES;  // Implicitly clear
             matrixfile = argv[i+1];
         }
         else if (string(argv[i])=="-ic")
@@ -204,7 +210,7 @@ int main(int argc, char* argv[])
     N->SetKinematicConstraint(kc);
     N->SetMaxY(maxy);
     N->SetMaxKtsqr(maxktsqr);
-    if (N->YPoints()<2)
+    if (N->YPoints()<2 and method==BRUTEFORCE and mode==GENERATE_DATAFILE)
     {
         cerr << "There must be at least 3 ypoints to evaluate " << endl;
         return -1;
@@ -254,12 +260,15 @@ int main(int argc, char* argv[])
             }
             else
             {
-                cout << "# Coefficient matrix will be saved in file " << matrixfile << endl;
+                cout << "# Solving coefficient matrix and saving it in file " << matrixfile << endl;
                 ((ChebyshevAmplitudeSolver*)N)->SolveMatrix();
                 ((ChebyshevAmplitudeSolver*)N)->SaveMatrix(matrixfile);
                 cout << "# Coefficient matrix saved in file " << matrixfile << endl;
             }
-            return 0;
+            cout << "# Evolving in rapidity" << endl;
+            ((ChebyshevAmplitudeSolver*)N)->Solve(maxy);
+            
+            
             break;
     }
 
