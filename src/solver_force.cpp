@@ -137,7 +137,7 @@ REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y)
         abserr << " relerror: " << abserr/result << endl;
 
     // Nonlinear term
-    result -= SQR(N(ktsqr, y));
+    //result -= SQR(N(ktsqr, y));   TODOOO!
     
     return alphabar*result;
 }
@@ -222,5 +222,15 @@ void BruteForceSolver::Solve(REAL maxy)
         cout << endl << "#" << largedifference << " out of " << maxyind * (KtsqrPoints()-1)
             << " too large differences" << endl;
     }
+
+}
+
+
+BruteForceSolver::BruteForceSolver()
+{
+
+}
+BruteForceSolver::~BruteForceSolver()
+{
 
 }

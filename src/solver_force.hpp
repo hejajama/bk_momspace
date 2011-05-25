@@ -8,6 +8,7 @@
 
 #include "config.hpp"
 #include "amplitude.hpp"
+#include <gsl/gsl_integration.h>
 #include <vector>
 #include <cmath>
 
@@ -17,7 +18,10 @@ class BruteForceSolver : public Amplitude
         void Solve(REAL maxy);
         REAL RapidityDerivative(REAL ktsqr, REAL y);
 
-
+        BruteForceSolver();
+        ~BruteForceSolver();
+    private:
+        
 
 
 };

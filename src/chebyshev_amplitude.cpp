@@ -7,6 +7,8 @@
 #include "datafile.hpp"
 #include "chebyshev_amplitude.hpp"
 #include <vector>
+#include <fstream>
+#include <sstream>
 #include <gsl/gsl_sf_gamma.h>
 #include <gsl/gsl_integration.h>
 #include <gsl/gsl_sf_bessel.h>
@@ -58,9 +60,9 @@ REAL Integrand_helperu(REAL u, void *p)
     // Problems if u=\pm 1
     REAL maxy=1.0; REAL miny=-1.0;REAL pts[3];
     int status;
-    if (u>1-1e-10 or u<-1+1e-10) {
+    if (u>1-1e-15 or u<-1+1e-15) {
         gsl_integration_cquad_workspace * workspace =gsl_integration_cquad_workspace_alloc(1000);
-        status=gsl_integration_cquad(&int_helper,-1+1e-10, 1-1e-10, 0, UVINTACCURACY,
+        status=gsl_integration_cquad(&int_helper,-1+1e-15, 1-1e-15, 0, UVINTACCURACY,
                 workspace, &result, &abserr, NULL);
         gsl_integration_cquad_workspace_free(workspace);
     }
@@ -109,7 +111,8 @@ REAL Integrand_helperv(REAL v, void* p)
     }
     else
     {
-        cerr <<"u=" << u <<", v=" << v <<", first part of integral \approx zero!!!!" << endl;
+        cerr <<"u=" << u <<", v=" << v <<", first part of integral \approx zero! At "
+         << LINEINFO << endl;
     }
     
     result += h->N->Basis(n, u)/std::sqrt(1.0+4.0*std::exp(-2.0*h->N->Delta(u,v)));
@@ -120,44 +123,72 @@ REAL Integrand_helperv(REAL v, void* p)
     
 }
 
-void ChebyshevAmplitudeSolver::Solve(REAL maxy)
+/*
+ * Contribution from the non-linear term -N(x)^2
+ * Can be computed using the properties of the Chebyshev polynomials
+ * m is the index of the coefficient which evolution we are computing,
+ * meaning that integratin \int dx (1-x^2)^{-1/2} E_m(x) (\sum_i a_i E_i(x) )^2
+ */
+REAL Pi(unsigned int i)
 {
-    Prepare();
-    REAL alphabar = 0.2;
+    if (i==0) return M_PI;
+    else return M_PI/2.0;
+}
 
-    /* Compute matrix F_{nm}
-     * = \int_0^1 dv \int_-1^1 du (1-u^2)^(-1/2) T_m(u) {
+struct inthelper_nonlin
+{
+    ChebyshevAmplitudeSolver* N;
+    unsigned int m;
+    REAL y;
+};
+
+REAL inthelperf_nonlin(REAL x, void* par)
+{
+    inthelper_nonlin* p = (inthelper_nonlin*) par;
+    return p->N->Basis(p->m, x)*SQR(p->N->N(p->N->Ktsqr(x), p->y) );
+    
+    
+}
+
+void ChebyshevAmplitudeSolver::SolveMatrix()
+{
+    /* Compute matrix F_{mn}
+     * = \int_-1^1 dv \int_-1^1 du (1-u^2)^(-1/2) T_m(u) {
      * (T_n(v) - exp(-delta)T_n(u) ) / Abs(exp(delta)-1)
      * + T_n(u)/Sqrt(1+4*exp(-2*delta)) }
-     * here delta = (m1+m2)(u-v)
+     * here delta = M(u-v)
      */
 
-    /*for ( int i=-100; i<100; i++)
-    {
-        REAL ktsqr = Ktsqr(i/100.0);
-        cout << ktsqr << " "<< InitialCondition(ktsqr) << " " << N(ktsqr, 0) << endl;
-
-    }
-    return;
-    */
-    Integrand_helper h;
-    h.N=this;
-    h.y=0;
-
-    gsl_function int_helper;
-    int_helper.function=&Integrand_helperu;
-    int_helper.params=&h;
-    REAL result, abserr;
-
-    std::vector< std::vector<REAL> > mat;
 
 
-    for (unsigned int n=0; n<chebyshev_degree; n++)
+    
+
+    mat.clear();
+    for (unsigned int n=0; n<=chebyshev_degree; n++)
     {
         std::vector<REAL> tmpvec;
-        #pragma omp parallel for
-        for (unsigned int m=0; m<chebyshev_degree; m++)
+        for (unsigned int m=0; m<=chebyshev_degree; m++)
         {
+            tmpvec.push_back(0.0);
+        }
+        mat.push_back(tmpvec);
+    }
+    
+
+    int ready=0;
+    #pragma omp parallel for
+    for (unsigned int n=0; n<=chebyshev_degree; n++)
+    {
+        
+        for (unsigned int m=0; m<=chebyshev_degree; m++)
+        {
+            REAL result, abserr;
+            Integrand_helper h;
+            h.N=this;
+            h.y=0;
+            gsl_function int_helper;
+            int_helper.function=&Integrand_helperu;
+            int_helper.params=&h;
             h.n=n;
             h.m=m;
     
@@ -175,16 +206,133 @@ void ChebyshevAmplitudeSolver::Solve(REAL maxy)
                     << std::abs(abserr/result) << endl;
             }
 
-            tmpvec.push_back(result);
+            mat[m][n]=result;
+            ready++;
+
+            if (ready%10==0)
+                cout << "# ready " << ready << " / " << SQR(chebyshev_degree+1) << endl;
             
             if (status) std::cerr << "Error " << status << " at " << LINEINFO
                 << ": Result " << result << ", relerror: "
                 << std::abs(abserr/result) << endl;
 
-            cout << "#F_{" << n << "," << m << "}=" <<result << " relerr " << std::abs(abserr/result) << endl;
+            //cout << "#F_{m=" << m << ", n=" << n << "}=" <<result << " relerr " << std::abs(abserr/result) << endl;
+        }
+
+
+    }
+
+    cout << "Saving to matrix.dat" << endl;
+    SaveMatrix("matrix_zero200.dat");
+    
+
+}
+
+/*
+ * Save matrix into a file
+ * Format is specified in README
+ */
+void ChebyshevAmplitudeSolver::SaveMatrix(std::string file)
+{
+    
+    std::ofstream stream;
+    stream.open(file.c_str());
+    stream <<"# Solved with initial condition " << InitialConditionStr() << endl;
+    stream <<"# Basis is " << boundary_condition << " (1=normal chebyshev, 2=boundary cond. E(1)=0"
+        << endl;
+    stream << "#M1=" << M1() << ", M2=" << M2() << endl;
+    stream <<"###" << chebyshev_degree << endl;
+
+    for (unsigned int m=0; m<=chebyshev_degree; m++)
+    {
+        stream << "#m=" << m << endl;
+        for (unsigned int n=0; n<=chebyshev_degree; n++)
+        {
+            stream << mat[m][n] << endl;
+        }
+    }
+
+    stream.close();
+}
+
+void ChebyshevAmplitudeSolver::LoadMatrix(std::string file)
+{
+    std::ifstream stream;
+    stream.open(file.c_str());
+    mat.clear();
+    while (!stream.eof())
+    {
+        std::string line;
+        std::getline(stream, line);
+
+        // Dimension
+        if (line.substr(0,3)=="###")
+        {
+            chebyshev_degree = StrToInt(line.substr(3,line.length()-3));
+            break;
+        }
+    }
+
+    for (unsigned int n=0; n<=chebyshev_degree; n++)
+    {
+        std::vector<REAL> tmpvec;
+        for (unsigned int m=0; m<=chebyshev_degree; m++)
+        {
+            tmpvec.push_back(0.0);
         }
         mat.push_back(tmpvec);
     }
+
+    unsigned int m=0;
+    unsigned int n=0;
+
+    // Coefficients are in order
+    // F_{m=0,n=0} \n F_{m=0, n=1} \n ...
+
+    while (!stream.eof())
+    {
+        std::string line;
+        std::getline(stream, line);
+        if (line.substr(0,1)=="#")
+            continue;
+        mat[m][n]=StrToReal(line);
+        n++;
+        if (n>chebyshev_degree)
+        {
+            m++; n=0;
+        }
+        if (m>chebyshev_degree)
+            break;
+    }
+        
+    if (m<chebyshev_degree)
+        cerr << "We found only " << m << " different m values for the matrix" << endl;
+
+
+}
+ 
+
+void ChebyshevAmplitudeSolver::Solve(REAL maxy)
+{
+    Prepare();
+    REAL alphabar = 0.2;
+
+    /* Compute matrix F_{nm}
+     * = \int_-1^1 dv \int_-1^1 du (1-u^2)^(-1/2) T_m(u) {
+     * (T_n(v) - exp(-delta)T_n(u) ) / Abs(exp(delta)-1)
+     * + T_n(u)/Sqrt(1+4*exp(-2*delta)) }
+     * here delta = M(u-v)
+     */
+
+    /*for ( int i=-100; i<100; i++)
+    {
+        REAL ktsqr = Ktsqr(i/100.0);
+        cout << ktsqr << " "<< InitialCondition(ktsqr) << " " << N(ktsqr, 0) << endl;
+
+    }
+    return;
+    */
+    
 
     // Evolve up to maxy
     // Find maxyind corresponding to maxy
@@ -196,22 +344,20 @@ void ChebyshevAmplitudeSolver::Solve(REAL maxy)
     }
 
 
-    // \pi_m \partial y a_m = (M_1+M_2) \alphabar \sum_n a_n f_{nm}
+    // \partial y a_m = (M_1+M_2) \alphabar \sum_n a_n f_{nm}
     for (unsigned int yind=1; yind<maxyind; yind++)
     {
         for (unsigned int aind=0; aind < mat.size(); aind++)
         {
-            REAL newa=0;
+            REAL dera=0;
             for (unsigned int tmpind=0; tmpind<mat.size(); tmpind++)
             {
                 //cout << "coef[" << yind-1 << "][" << tmpind << "]*mat[tmpind][" << aind << endl;
-                newa += coef[yind-1][tmpind]*mat[tmpind][aind];
+                dera += coef[yind-1][tmpind]*mat[aind][tmpind];
             }
-            if (aind==0) newa /= M_PI;
-            else newa /= M_PI/2.0;
-            newa *= (M1()+M2())*alphabar;
-            newa *= yvals[yind]-yvals[yind-1];
-            coef[yind][aind]=newa;
+            dera *= (M1()+M2())*alphabar;
+            dera -= alphabar*NonLinear(aind, yind-1);
+            coef[yind][aind]=coef[yind-1][aind] + (yvals[yind]-yvals[yind-1])*dera;
 
         }
     }
@@ -221,20 +367,105 @@ void ChebyshevAmplitudeSolver::Solve(REAL maxy)
     gsl_cheb_series *cs = gsl_cheb_alloc (chebyshev_degree);
     for (unsigned int i=0; i<=chebyshev_degree; i++)
     {        
-        cs->c[i] = coef[5][i];
+        cs->c[i] = coef[0][i];
     }
     cs->a=0.0;
     cs->b=1.0;
     cs->order=chebyshev_degree;
 
-    for (unsigned int uind=0; uind<100; uind++)
+    for (int uind=-100; uind<100; uind++)
     {
         REAL tmpu = uind/100.0;
         REAL ktsqr = Ktsqr(tmpu);
-        cout << ktsqr << " " << gsl_cheb_eval(cs, tmpu) << endl;
+        REAL amp=0; REAL amp2=0; REAL amp3=0;
+        for (unsigned int d=0; d<=chebyshev_degree; d++)
+        {
+            amp += coef[0][d]*basis[d].Evaluate(tmpu);
+            amp2 += coef[1][d]*basis[d].Evaluate(tmpu);
+            amp3 += coef[5][d]*basis[d].Evaluate(tmpu);
+        }
+        
+        cout << ktsqr << " " << amp << " " << amp2 << " " << amp3 << endl;
     }
 
 };
+
+/*
+ * Compute \int du/Sqrt[1-u^2] E_m(x) N(x)^2
+ */
+
+REAL ChebyshevAmplitudeSolver::NonLinear(unsigned int m, unsigned int yind)
+{
+    REAL result=0;
+
+    // Weight function (1-x^2)^(-1/2) = [ (1-x)*(1+x) ]^(-1/2)
+    // -> (x-a)^\alpha (b-x)^\beta \log^\mu (x-a) \log^\nu (b-x) weight function,
+    // a=-1, b=1 => \alpha=-1/2, \beta=-1/2, \mu=0, \nu=0
+    gsl_integration_qaws_table* table; table = gsl_integration_qaws_table_alloc( -0.5, -0.5, 0, 0);
+    const int MAXITER_NONLINEAR = 1000;
+    const REAL NONLINEAR_ACCURACY = 0.001;
+    gsl_integration_workspace* workspace = gsl_integration_workspace_alloc(MAXITER_NONLINEAR);
+    inthelper_nonlin helper;
+    helper.N=this;
+    helper.m=m; helper.y=yvals[yind];
+    gsl_function int_helper;
+    int_helper.function=inthelperf_nonlin;
+    int_helper.params=&helper;
+    REAL abserr;
+    int status = gsl_integration_qaws( &int_helper, -1.0, 1.0, table,
+        0, NONLINEAR_ACCURACY, MAXITER_NONLINEAR, workspace, &result, &abserr);
+    if (status)
+    {
+        cerr << "Error " << status << " at " << LINEINFO << ": result " << result
+            << ", relerr " << std::abs(abserr/result) << ", m=" << m << ", yind=" << yind
+            << endl;
+    }
+    gsl_integration_workspace_free(workspace);
+    gsl_integration_qaws_table_free(table);
+    return result;
+    
+    switch(boundary_condition)
+    {
+        case CHEBYSHEV:
+
+
+            break;
+        case CHEBYSHEV_ZERO:
+            
+            /*
+            for (unsigned int n=0; n<=chebyshev_degree; n++)
+            {
+                for (unsigned int nn=0; nn<=chebyshev_degree; nn++)
+                {
+                    REAL tmpres=0;
+                    for (unsigned int i2=0; i2<=chebyshev_degree; i2++)
+                    {
+                        for (unsigned int i3=0; i3<=chebyshev_degree; i3++)
+                        {
+                            if (i2+i3 <=chebyshev_degree)
+                                tmpres += BasisVector(m).Component(i2+i3)
+                                    * Pi(i2+i3);
+                            
+                            int abs = std::abs(static_cast<int>(i2)-static_cast<int>(i3));
+                            tmpres += BasisVector(m).Component(abs)
+                                * Pi(abs);
+                            tmpres *= BasisVector(n).Component(i2)
+                                    * BasisVector(nn).Component(i3);
+                        }
+                    }
+                    tmpres *= coef[yind][n]*coef[yind][nn];
+                    tmpres *= 0.5;
+                    result +=tmpres;
+                }
+            }
+            */
+                            
+
+            break;
+    }
+    return result;
+
+}
 
 /*
  * Prepare everything
@@ -300,13 +531,6 @@ void ChebyshevAmplitudeSolver::Prepare()
     a1*=2.0/chebyshev_degree;
     */
 
-    for (unsigned int i=0; i<=chebyshev_degree; i++)
-    {
-        REAL tmpc = coef[0][i]/std::sqrt(M_PI);
-        if (i!=0) tmpc *= std::sqrt(2);
-        //cout << "coef " << i << " " << tmpc << " reldiff " << std::abs((series->c[i]-tmpc)/tmpc)
-        //    << endl;
-    }
 
 
     for (int i=-100; i<=100; i++)
@@ -332,14 +556,12 @@ void ChebyshevAmplitudeSolver::Prepare()
 void ChebyshevAmplitudeSolver::ComputeBasisVectors()
 {
     // Make the basis orthonormal by Gram-Schmidt process
-    REAL ff;
     switch(boundary_condition)
     {        
     case CHEBYSHEV_ZERO:
-        {
+    {
         // Boundary condition: T_n(1)=0
         basis.clear();
-        cout << "starting....\n";
         ChebyshevVector v1(chebyshev_degree);
         v1.SetComponent(1,1.0); v1.SetComponent(0,-1.0);    // T_1 -1
         v1.Normalize();
@@ -361,13 +583,12 @@ void ChebyshevAmplitudeSolver::ComputeBasisVectors()
             tmpvec.Normalize();
             //cout << "Basis vector " << j-2 <<": " << tmpvec << endl;
             basis.push_back(tmpvec);
-            ff++;
         }
         // Let's allways have chebyshev_degree+1 vectors in the basis vector
         ChebyshevVector v0(chebyshev_degree);
         basis.push_back(v0);
-        }
         break;
+    }
     case CHEBYSHEV:
         for (unsigned int i=0; i<=chebyshev_degree; i++)
         {

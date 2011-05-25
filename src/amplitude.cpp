@@ -27,7 +27,7 @@ Amplitude::Amplitude()
     delta_y = DEFAULT_DELTA_Y;
     averages=0;
     datafile=false;
-    adams_method=true;
+    adams_method=false;
 }
 
 /*
@@ -131,7 +131,7 @@ REAL Amplitude::N(REAL ktsqr, REAL y)
 	}
 	else if (ktsqrind + INTERPOLATION_POINTS/2 > KtsqrPoints()-2 )
 	{
-		interpolation_end = KtsqrPoints()-2;
+		interpolation_end = KtsqrPoints()-1;
 		interpolation_start = KtsqrPoints()-INTERPOLATION_POINTS-2;
 	}
 	else
@@ -167,7 +167,12 @@ REAL Amplitude::N(REAL ktsqr, REAL y)
     gsl_spline *spline = gsl_spline_alloc(gsl_interp_cspline, interpo_points);
     gsl_spline_init(spline, tmpxarray, tmparray, interpo_points);
 
-    REAL res = gsl_spline_eval(spline, ktsqr, acc);
+    REAL res;
+    int status = gsl_spline_eval_e(spline, ktsqr, acc, &res);
+    if (status)
+    {
+        cerr << "Interpolatioin failed at " << LINEINFO << ", error " << status << endl;
+    }
     gsl_spline_free(spline);
     gsl_interp_accel_free(acc);
     delete[] tmparray;
@@ -309,7 +314,7 @@ void Amplitude::SolveGSL(REAL maxy)
     gsl_odeiv_system sys = {func, NULL, KtsqrPoints(), &dim};
 
     REAL* phi = new REAL[KtsqrPoints()];
-    for (int i=0; i<KtsqrPoints(); i++)
+    for (unsigned int i=0; i<KtsqrPoints(); i++)
     {
         phi[i]=n[i][0];
     }
@@ -336,7 +341,7 @@ void Amplitude::SolveGSL(REAL maxy)
                 cerr << "Error at " << LINEINFO << ": code " << status << endl;
             }
             yvals[yind]=Y;
-            for (int i=0; i<KtsqrPoints(); i++)
+            for (unsigned int i=0; i<KtsqrPoints(); i++)
                 n[yind][i] = phi[i];
 
         }

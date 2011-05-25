@@ -94,10 +94,10 @@ void DataFile::GetData(std::vector< std::vector<REAL> > &n)
 	*/
 	n.clear();
     // Return vector where indexes are vec[ktsqr][y]
-    for (int k=0; k<ktsqrpoints; k++)
+    for (unsigned int k=0; k<ktsqrpoints; k++)
     {
         std::vector<REAL> tmpvec;
-        for (int y=0; y<data.size(); y++)
+        for (unsigned int y=0; y<data.size(); y++)
         {
             tmpvec.push_back(data[y][k]);
         }

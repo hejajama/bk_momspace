@@ -34,3 +34,14 @@ etc.
 amplitude
 
 and so on.
+
+Matrix used in ChebyhsevAmplitudeSolver is saved in format
+###dimension
+F_0,0
+F_0,1
+F_0,2
+...
+F_mn
+...
+F_(dimension+1),(dimension+1)
+So there area (dimension+1)^2 lines after the ###dimension line

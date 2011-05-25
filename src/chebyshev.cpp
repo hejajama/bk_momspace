@@ -73,7 +73,7 @@ REAL ChebyshevVector::DotProduct(REAL(*f)(REAL x, void* p), void* p)
     table = gsl_integration_qaws_table_alloc( -0.5, -0.5, 0, 0);
     int status = gsl_integration_qaws( &int_helper, -1.0, 1.0, table,
         0, INNERPROD_ACCURACY, MAXITER_INNERPROD, workspace, &result, &abserr);
-    if (status and (std::abs(result)>1e-14 or std::abs(result)/abserr > 100) )
+    if (status /*and (std::abs(result)>1e-14 or std::abs(result)/abserr > 100)*/ )
     {
         cerr << "Error " << status << " at innerprod, result "
         << result << " relerr " << std::abs(abserr)/result

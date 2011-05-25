@@ -36,11 +36,18 @@ enum MODE
     LOGLOG_DERIVATIVE   // Calculate d ln N(k^2) / d ln(k^2)
 };
 
+enum METHOD
+{
+    BRUTEFORCE,             // BruteForceSolver
+    CHEBYSHEV_SERIES        // ChebyshevAmplitudeSolver
+};
+
 int main(int argc, char* argv[])
 {        
     ChebyshevAmplitudeSolver N;
     N.SetChebyshevDegree(200);
     N.SetBoundaryCondition(CHEBYSHEV_ZERO);
+
     //BruteForceSolver N;
     REAL minktsqr=DEFAULT_MINKTSQR;
     REAL maxktsqr = DEFAULT_MAXKTSQR;
@@ -54,9 +61,15 @@ int main(int argc, char* argv[])
     INITIAL_CONDITION ic=FTIPSAT;
     MODE mode=GENERATE_DATAFILE;
     bool kc=false;  // Kinematical constraint
+
+    // Parameters for BruteForceSolver
     bool read_data=false;
     string datafile="output";
     int avg=0;
+
+    // Parameters for ChebyshevAmplitudeSolver
+    int chebyshev_degree=0;
+    std::string matrixfile="matrix.dat";
 
     gsl_set_error_handler(&ErrHandler);
     
@@ -68,6 +81,7 @@ int main(int argc, char* argv[])
     {
         cout << "Usage: " << endl;
         cout << "-mode [MODE]: what to do, modes: GENERATE_DATA, GENERATE_PLOTS, LOGLOG_DERIVATIVE" << endl;
+        cout << "-method [METHOD]: what method is used to solve BK, methods: BRUTEFORCE, CHEBYSHEV_SERIES" << endl;
         cout << "-output [prefix]: set output file prefix, filenames are prefix_y[rapidity].dat" << endl;
         cout << "-miny, -maxy: rapidity values to solve" << endl;
         //cout << "-minktsqr, -maxktsqr: range of k_T^2 to plot, doesn't affect to limits when solving BK" << endl;
@@ -178,6 +192,10 @@ int main(int argc, char* argv[])
         << " = " << N.KtsqrPoints()*N.YPoints() << endl;
     infostr << "# Number of averagements: " << avg << endl;
     cout << infostr.str();
+
+    N.Prepare();
+    N.SolveMatrix();
+    //N.LoadMatrix("matrix_zero100.dat");
     
     if (mode==GENERATE_DATAFILE)
     {

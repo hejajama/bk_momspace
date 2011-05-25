@@ -15,8 +15,8 @@
 
 enum BASIS_BOUNDARY_CONDITION
 {
-    CHEBYSHEV,
-    CHEBYSHEV_ZERO,        // Chebyshevs which are 0 at x=1
+    CHEBYSHEV=1,
+    CHEBYSHEV_ZERO=2,        // Chebyshevs which are 0 at x=1
 };
 
 
@@ -25,12 +25,17 @@ class ChebyshevAmplitudeSolver : public Amplitude
     public:
         ChebyshevAmplitudeSolver();
         ~ChebyshevAmplitudeSolver();
+        void SolveMatrix();
+        void SaveMatrix(std::string file);
+        void LoadMatrix(std::string file);
         void Solve(REAL maxy);
         void Prepare();
         REAL Chebyshev(unsigned int n, REAL x);
         REAL Delta(REAL u, REAL v);
         REAL Basis(unsigned int n, REAL x);     // Evaluate ith basis function
         ChebyshevVector& BasisVector(unsigned int n); // Poitner to nth basis vec
+
+        REAL NonLinear(unsigned int m, unsigned int yind);
 
         REAL N(REAL ktsqr, REAL y);
 
@@ -49,6 +54,10 @@ class ChebyshevAmplitudeSolver : public Amplitude
         // Each pointer points to an array with CHEBYSHEV_ORDER numbers
         // This for so it is efficient to use with GSL
         std::vector< std::vector<REAL> > coef;
+
+        // Matrix which contains the matrix which multiplies the
+        // coefficients, syntax mat[m][n]
+        std::vector< std::vector<REAL> > mat;
 
         // Basis vectors
         std::vector< ChebyshevVector > basis;

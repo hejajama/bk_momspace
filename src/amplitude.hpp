@@ -11,7 +11,7 @@
 #include <cmath>
 //#include <bci.h>
 
-const REAL DEFAULT_DELTA_Y=0.2;
+const REAL DEFAULT_DELTA_Y=0.1;
 const unsigned int DEFAULT_MAXY=50;
 const REAL DEFAULT_KTSQR_MULTIPLIER = 1.01;  // ktsqr_{i+1} = ktsqr_i*KTSQR_MULTIPLIER
 //const REAL DEFAULT_KTSQR_MULTIPLIER = 1.05;
