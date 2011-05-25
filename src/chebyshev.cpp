@@ -69,7 +69,6 @@ REAL ChebyshevVector::DotProduct(REAL(*f)(REAL x, void* p), void* p)
     // a=-1, b=1 => \alpha=-1/2, \beta=-1/2, \mu=0, \nu=0
     gsl_integration_workspace* workspace = gsl_integration_workspace_alloc(MAXITER_INNERPROD);
 
-    ///TODO: Intialize table only once!
     table = gsl_integration_qaws_table_alloc( -0.5, -0.5, 0, 0);
     int status = gsl_integration_qaws( &int_helper, -1.0, 1.0, table,
         0, INNERPROD_ACCURACY, MAXITER_INNERPROD, workspace, &result, &abserr);

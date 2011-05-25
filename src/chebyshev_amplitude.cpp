@@ -102,7 +102,7 @@ REAL Integrand_helperv(REAL v, void* p)
     unsigned int m=h->m;
     REAL u=h->u;
      
-    // We don't need to worry about apparrent infinity at u=v, as
+    // We don't need to worry about the fact that the case u=v is not defined, as
     // the integration routine knows that something nasty is happening there
     if (std::abs(u-v)>1e-30)
     {
@@ -123,32 +123,6 @@ REAL Integrand_helperv(REAL v, void* p)
     
 }
 
-/*
- * Contribution from the non-linear term -N(x)^2
- * Can be computed using the properties of the Chebyshev polynomials
- * m is the index of the coefficient which evolution we are computing,
- * meaning that integratin \int dx (1-x^2)^{-1/2} E_m(x) (\sum_i a_i E_i(x) )^2
- */
-REAL Pi(unsigned int i)
-{
-    if (i==0) return M_PI;
-    else return M_PI/2.0;
-}
-
-struct inthelper_nonlin
-{
-    ChebyshevAmplitudeSolver* N;
-    unsigned int m;
-    REAL y;
-};
-
-REAL inthelperf_nonlin(REAL x, void* par)
-{
-    inthelper_nonlin* p = (inthelper_nonlin*) par;
-    return p->N->Basis(p->m, x)*SQR(p->N->N(p->N->Ktsqr(x), p->y) );
-    
-    
-}
 
 void ChebyshevAmplitudeSolver::SolveMatrix()
 {
@@ -202,7 +176,7 @@ void ChebyshevAmplitudeSolver::SolveMatrix()
             if (status )
             {
                 cerr << "uint failed at " << LINEINFO << ", error " << status
-                    << ", result: " << result << " relerr "
+                    << ", m=" << m <<", n=" << n <<", result: " << result << " relerr "
                     << std::abs(abserr/result) << endl;
             }
 
@@ -221,9 +195,6 @@ void ChebyshevAmplitudeSolver::SolveMatrix()
 
 
     }
-
-    cout << "Saving to matrix.dat" << endl;
-    SaveMatrix("matrix_zero200.dat");
     
 
 }
@@ -311,6 +282,8 @@ void ChebyshevAmplitudeSolver::LoadMatrix(std::string file)
 
 }
  
+REAL inthelperf_nonlin(REAL x, void* par);
+struct inthelper_nonlin;
 
 void ChebyshevAmplitudeSolver::Solve(REAL maxy)
 {
@@ -393,6 +366,33 @@ void ChebyshevAmplitudeSolver::Solve(REAL maxy)
 /*
  * Compute \int du/Sqrt[1-u^2] E_m(x) N(x)^2
  */
+
+/*
+ * Contribution from the non-linear term -N(x)^2
+ * Can be computed using the properties of the Chebyshev polynomials
+ * m is the index of the coefficient which evolution we are computing,
+ * meaning that integratin \int dx (1-x^2)^{-1/2} E_m(x) (\sum_i a_i E_i(x) )^2
+ */
+REAL Pi(unsigned int i)
+{
+    if (i==0) return M_PI;
+    else return M_PI/2.0;
+}
+
+struct inthelper_nonlin
+{
+    ChebyshevAmplitudeSolver* N;
+    unsigned int m;
+    REAL y;
+};
+
+REAL inthelperf_nonlin(REAL x, void* par)
+{
+    inthelper_nonlin* p = (inthelper_nonlin*) par;
+    return p->N->Basis(p->m, x)*SQR(p->N->N(p->N->Ktsqr(x), p->y) );
+    
+    
+}
 
 REAL ChebyshevAmplitudeSolver::NonLinear(unsigned int m, unsigned int yind)
 {
@@ -510,42 +510,6 @@ void ChebyshevAmplitudeSolver::Prepare()
         // = \int_-1^1 (1-x^2)^{-1/2} IC(x)*base[i](x)
         coef[0][i] = basis[i].DotProduct(ICHelperf, &help);
     }
-
-    // Test....
-    /*gsl_cheb_series *series = gsl_cheb_alloc (chebyshev_degree);
-    gsl_function f; f.function=ICHelperf; f.params=&help;
-    gsl_cheb_init (series, &f, -1.0, 1.0);
-
-    REAL *x = new REAL[chebyshev_degree+1];
-    for (int k=0; k<=chebyshev_degree; k++)
-        x[k]=std::cos(M_PI*(k+0.5)/chebyshev_degree);
-
-    REAL a0=0;
-    REAL a1=0;
-    for (int k=0; k<chebyshev_degree; k++)
-    {
-        a0+= std::cos(0*M_PI*(k+0.5)/chebyshev_degree) * InitialCondition(Ktsqr(x[k]));
-        a1+= std::cos(5.0*M_PI*(k+0.5)/chebyshev_degree) * InitialCondition(Ktsqr(x[k]));
-    }
-    a0*=1.0/chebyshev_degree;
-    a1*=2.0/chebyshev_degree;
-    */
-
-
-
-    for (int i=-100; i<=100; i++)
-    {
-        REAL x = i/100.0;
-        REAL ktsqr=Ktsqr(x);
-        REAL newbasis=0;
-        for (unsigned int d=0; d<=chebyshev_degree; d++)
-            newbasis += coef[0][d]*basis[d].Evaluate(x);
-        /*cout << ktsqr << " " << InitialCondition(ktsqr) << " "
-            << newbasis << " "<< gsl_cheb_eval(series, x) << endl;*/
-
-    }
-    //for (unsigned int d=0; d<basis.size(); d++)
-    //    cout << d << " " << basis[d].Evaluate(1) << endl;
 
 }
 
@@ -753,4 +717,15 @@ ChebyshevVector& ChebyshevAmplitudeSolver::BasisVector(unsigned int n)
 void ChebyshevAmplitudeSolver::SetBoundaryCondition(BASIS_BOUNDARY_CONDITION bc)
 {
     boundary_condition=bc;
+}
+
+REAL ChebyshevAmplitudeSolver::MinKtsqr()
+{
+    return std::exp(-std::log(maxktsqr));
+}
+
+
+REAL ChebyshevAmplitudeSolver::MaxKtsqr()
+{
+    return maxktsqr;
 }

@@ -68,8 +68,8 @@ class Amplitude
         unsigned int KtsqrPoints();
         REAL KtsqrMultiplier();
         REAL DeltaY();
-        REAL MinKtsqr();
-        REAL MaxKtsqr();
+        virtual REAL MinKtsqr();
+        virtual REAL MaxKtsqr();
 
         REAL InitialCondition(REAL ktsqr);  // N() at y=0
         

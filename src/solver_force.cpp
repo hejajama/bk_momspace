@@ -137,7 +137,7 @@ REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y)
         abserr << " relerror: " << abserr/result << endl;
 
     // Nonlinear term
-    //result -= SQR(N(ktsqr, y));   TODOOO!
+    result -= SQR(N(ktsqr, y));
     
     return alphabar*result;
 }

@@ -46,7 +46,9 @@ class ChebyshevAmplitudeSolver : public Amplitude
 
         void SetChebyshevDegree(unsigned int d);
         void SetBoundaryCondition(BASIS_BOUNDARY_CONDITION bc);
-        
+
+        REAL MinKtsqr();
+        REAL MaxKtsqr();
 
 
     private:
