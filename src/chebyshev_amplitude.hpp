@@ -35,7 +35,12 @@ class ChebyshevAmplitudeSolver : public Amplitude
         REAL Basis(unsigned int n, REAL x);     // Evaluate ith basis function
         ChebyshevVector& BasisVector(unsigned int n); // Poitner to nth basis vec
 
-        REAL NonLinear(unsigned int m, unsigned int yind);
+        // Contribution from NL term
+        REAL NonLinear(unsigned int m, unsigned int yind); 
+
+        // Contribution from kinematical constarint (lowest order)
+        REAL KinematicLO(unsigned int m, unsigned int n, unsigned int yind);
+        
 
         REAL N(REAL ktsqr, REAL y);
 
@@ -45,7 +50,10 @@ class ChebyshevAmplitudeSolver : public Amplitude
         REAL U(REAL ktsqr);
 
         void SetChebyshevDegree(unsigned int d);
+        unsigned int ChebyshevDegree();
         void SetBoundaryCondition(BASIS_BOUNDARY_CONDITION bc);
+
+        REAL Coefficient( unsigned int yind, unsigned int degree);
 
         REAL MinKtsqr();
         REAL MaxKtsqr();

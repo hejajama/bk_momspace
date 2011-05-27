@@ -66,7 +66,7 @@ void Amplitude::Initialize()
         tmpdervec.push_back(0.0);
         for (unsigned int j=1; j<=YPoints(); j++)
         {
-            tmpvec.push_back(-1.0);
+            tmpvec.push_back(0.0);
             tmpdervec.push_back(0.0);
         }
         n.push_back(tmpvec);
@@ -99,11 +99,12 @@ REAL Amplitude::N(REAL ktsqr, REAL y)
     }
     if (yind < 0) // Didn't find, so refers to the largest one 
     {
-        yind=yvals.size()-2;
-        cerr << "Asked amplitude at too large Y=" << y << ", falling back to "
-            << " y=" << yvals[yind] << ". " << LINEINFO << endl;
+        yind=yvals.size()-1;
+        if (y-yvals[yind]>0.05)
+            cerr << "Asked amplitude at too large Y=" << y << ", falling back to "
+                << " y=" << yvals[yind] << ". " << LINEINFO << endl;
     }
-    for (unsigned int i=0; i<=ktsqrvals.size()-2; i++)
+    for (unsigned int i=0; i<ktsqrvals.size()-1; i++)
     {
         if (ktsqrvals[i]<=ktsqr and ktsqrvals[i+1]>ktsqr)
         {
@@ -113,9 +114,10 @@ REAL Amplitude::N(REAL ktsqr, REAL y)
     }
     if (ktsqrind < 0) // Didn't find, so refers to the largest one 
     {
-        ktsqrind=ktsqrvals.size()-2;
-        cerr << "Asked amplitude at too large ktsqr=" << ktsqr << ", falling back to "
-            << " ktsqr=" << ktsqrvals[ktsqrind] << ". " << LINEINFO << endl;
+        ktsqrind=ktsqrvals.size()-1;
+        if (ktsqr - ktsqrvals[ktsqrvals.size()-1] > 100)
+            cerr << "Asked amplitude at too large ktsqr=" << ktsqr << ", falling back to "
+                << " ktsqr=" << ktsqrvals[ktsqrind] << ". " << LINEINFO << endl;
     }
 
     // Keep y fixed, interpolate ktsqr
@@ -242,6 +244,9 @@ REAL Amplitude::InitialCondition(REAL ktsqr)
             if (ktsqr > 2500) return 0.0;
             return gsl_sf_gamma_inc(0.0,ktsqr/4.0); // Ft of 2(1-exp(-r^2))
             break;
+        case INVPOWER4:
+            return pow(SQR(ktsqr)+1, -1);
+            break;
         default:
             cerr << "Unrecognized initial condition " << ic << endl;
     }
@@ -267,6 +272,9 @@ string Amplitude::InitialConditionStr()
             break;
         case FTIPSAT:
             return "Gamma[0, kt^2/4], FT of 2(1-exp(-r^2))";
+            break;
+        case INVPOWER4:
+            return "(kt^4+1)^(-1), arbitrary";
             break;
         default:
             return "Unknown initial condition";

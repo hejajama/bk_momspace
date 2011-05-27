@@ -128,11 +128,25 @@ REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y)
 
     REAL result, abserr; 
     gsl_integration_workspace *workspace 
-     = gsl_integration_workspace_alloc(KTSQRINTITERATIONS); 
-    int status=gsl_integration_qag(&int_helper, ktsqrvals[0], ktsqrvals[ktsqrvals.size()-2], 0, KTSQRINTACCURACY, 
-        KTSQRINTITERATIONS, GSL_INTEG_GAUSS21, workspace, &result, &abserr);
+     = gsl_integration_workspace_alloc(KTSQRINTITERATIONS);
+
+    int status;
+    // If ktsqr != ktsqr', we can tell GSL that there is a difficult point
+    // at ktsqr'=ktsqr
+    if (ktsqr>ktsqrvals[0] and ktsqr<ktsqrvals[ktsqrvals.size()-2] and true==false)
+    {
+        REAL range[3]; range[0]=ktsqrvals[0];
+        range[1]=ktsqr; range[2]=ktsqrvals[ktsqrvals.size()-2];
+        status = gsl_integration_qagp(&int_helper, range, 3, 0, KTSQRINTACCURACY,
+            KTSQRINTITERATIONS, workspace, &result, &abserr);
+    } else
+    {
+        status=gsl_integration_qag(&int_helper, ktsqrvals[0],
+            ktsqrvals[ktsqrvals.size()-2], 0, KTSQRINTACCURACY, 
+            KTSQRINTITERATIONS, GSL_INTEG_GAUSS21, workspace, &result, &abserr);
+    }
     gsl_integration_workspace_free(workspace);
-    if (status or result>1e6 or result<-1e6) cerr << "Error " << status << " at " << LINEINFO << ":"
+    if (status ) cerr << "Error " << status << " at " << LINEINFO << ":"
         << " ktsqr=" << ktsqr <<", y=" << y << " result=" << result << ", abserror=" <<
         abserr << " relerror: " << abserr/result << endl;
 
@@ -160,7 +174,7 @@ void BruteForceSolver::Solve(REAL maxy)
         // Solve N(y+DELTA_Y, kt) for every kt
 
 #pragma omp parallel for
-        for (unsigned int ktsqrind=0; ktsqrind<KtsqrPoints()-1; ktsqrind++)
+        for (unsigned int ktsqrind=0; ktsqrind<KtsqrPoints(); ktsqrind++)
         {
             REAL tmpkt = ktsqrvals[ktsqrind];
             REAL dy = yvals[yind]-yvals[yind-1];

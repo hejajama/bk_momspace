@@ -33,6 +33,7 @@ enum MODE
 {
     GENERATE_DATAFILE,      // Solve and print output to one huge file
     GENERATE_PLOTS,         // Print output to different files with constant rapidity
+    GENERATE_SINGLE_PLOT,   // Print amplitude at a given rapidity
     LOGLOG_DERIVATIVE   // Calculate d ln N(k^2) / d ln(k^2)
 };
 
@@ -72,7 +73,7 @@ int avg=0;
 string file_prefix="output";
 
 // Parameters for ChebyshevAmplitudeSolver
-int chebyshev_degree=0;
+int chebyshev_degree=100;
 std::string matrixfile="matrix.dat";
 CHEBYSHEV_MATRIX cheb_matrix = LOAD;
 
@@ -81,6 +82,9 @@ std::stringstream infostr;
 void GenerateDataFile();
 void GeneratePlots();
 void LogLogDerivative();
+void SinglePlot();
+void SinglePlotR();     // FT to r-space
+void Clear();
 
 int main(int argc, char* argv[])
 {
@@ -97,18 +101,19 @@ int main(int argc, char* argv[])
     if (argc>1)  if (string(argv[1])=="-help")
     {
         cout << "Usage: " << endl;
-        cout << "-mode [MODE]: what to do, modes: GENERATE_DATA, GENERATE_PLOTS, LOGLOG_DERIVATIVE" << endl;
+        cout << "-mode [MODE]: what to do, modes: GENERATE_DATA, GENERATE_PLOTS, SINGLE_PLOT, LOGLOG_DERIVATIVE" << endl;
         cout << "-method [METHOD]: what method is used to solve BK, methods: BRUTEFORCE, CHEBYSHEV" << endl;
         cout << "-output [prefix]: set output file prefix, filenames are prefix_y[rapidity].dat" << endl;
         cout << "-miny, -maxy: rapidity values to solve" << endl;
         //cout << "-minktsqr, -maxktsqr: range of k_T^2 to plot, doesn't affect to limits when solving BK" << endl;
-        cout << "-ic [initial condition]: set initial condition, possible ones are FTIPSAT, INVPOWER " << endl;
+        cout << "-ic [initial condition]: set initial condition, possible ones are FTIPSAT, INVPOWER, INVPOWER4 " << endl;
         cout << "-kc: apply kinematical constraint" << endl;
         cout << "-avg [avgs]: number or averagements" << endl;
         cout << "-data [datafile]: read data from datafiles from path datafile_y[rapdity].dat" << endl;
         cout << "  -maxdatay [yval]: set maximum y value for datafiles, -delta_datay [yval] difference of yvals for datafiles" << endl;
         cout << "-y [yval]: rapidity value for e.g. loglog derivative" << endl;
         cout << "-load_matrix [filename], -save_matrix [filename]: load/save coefficient matrix (CHEBYSHEV method)" << endl;
+        cout << "-chebyshev_degree [number]: number of basis vectors" << endl;
         return 0;
     }
 
@@ -153,12 +158,16 @@ int main(int argc, char* argv[])
             method = CHEBYSHEV_SERIES;  // Implicitly clear
             matrixfile = argv[i+1];
         }
+        else if (string(argv[i])=="-chebyshev_degree")
+            chebyshev_degree = StrToInt(argv[i+1]);
         else if (string(argv[i])=="-ic")
         {
             if (string(argv[i+1])=="FTIPSAT")
                 ic = FTIPSAT;
             else if (string(argv[i+1])=="INVPOWER")
                 ic = INVPOWER;
+            else if (string(argv[i+1])=="INVPOWER4")
+                ic = INVPOWER4;
             else
             {
                 cerr << "Unrecognized initial condition " << argv[i+1] << ", exiting..." << endl;
@@ -173,6 +182,8 @@ int main(int argc, char* argv[])
                 mode=LOGLOG_DERIVATIVE;
 			else if (string(argv[i+1])=="GENERATE_PLOTS")
 				mode=GENERATE_PLOTS;
+            else if (string(argv[i+1])=="SINGLE_PLOT")
+                mode=GENERATE_SINGLE_PLOT;
             else
             {
                 cerr << "Unrecognized mode " << argv[i+1] << ", exiting..." << endl;
@@ -231,6 +242,9 @@ int main(int argc, char* argv[])
     infostr << "# Number of averagements: " << avg << endl;
     cout << infostr.str() << endl;
 
+    if (y>0)    // We should evolve amplitude up to y
+        maxy = y + DEFAULT_DELTA_Y; 
+
     switch(method)
     {
         case BRUTEFORCE:
@@ -249,23 +263,35 @@ int main(int argc, char* argv[])
             
             break;
         case CHEBYSHEV_SERIES:
-            ((ChebyshevAmplitudeSolver*)N)->SetChebyshevDegree(200);
             ((ChebyshevAmplitudeSolver*)N)->SetBoundaryCondition(CHEBYSHEV_ZERO);
-            ((ChebyshevAmplitudeSolver*)N)->Prepare();
 
             if (cheb_matrix==LOAD)
             {
                 cout << "# Loading coefficient matrix from file " << matrixfile << endl;
                 ((ChebyshevAmplitudeSolver*)N)->LoadMatrix(matrixfile);
+                cout << "# Intializing ChebyshevAmplitudeSolver environment..." << endl;
+                ((ChebyshevAmplitudeSolver*)N)->Prepare();
+
+                // Check if we are asked to use fewer number of cheb polynomials
+                // as it would be possible
+                if (chebyshev_degree < ((ChebyshevAmplitudeSolver*)N)->ChebyshevDegree())
+                    ((ChebyshevAmplitudeSolver*)N)->SetChebyshevDegree(chebyshev_degree);
             }
             else
             {
+                cout << "# Intializing ChebyshevAmplitudeSolver environment..." << endl;
+                ((ChebyshevAmplitudeSolver*)N)->SetChebyshevDegree(chebyshev_degree);
+                ((ChebyshevAmplitudeSolver*)N)->Prepare();
                 cout << "# Solving coefficient matrix and saving it in file " << matrixfile << endl;
                 ((ChebyshevAmplitudeSolver*)N)->SolveMatrix();
                 ((ChebyshevAmplitudeSolver*)N)->SaveMatrix(matrixfile);
                 cout << "# Coefficient matrix saved in file " << matrixfile << endl;
+                Clear();
+                return 0;
             }
+            cout << "# Chebyshev degree is " << ((ChebyshevAmplitudeSolver*)N)->ChebyshevDegree() << endl;
             cout << "# Evolving in rapidity" << endl;
+            
             ((ChebyshevAmplitudeSolver*)N)->Solve(maxy);
             
             
@@ -275,6 +301,19 @@ int main(int argc, char* argv[])
     /******
      * Do some science with results
      *****/
+
+
+
+     ////////DEBUG
+    /*ChebyshevAmplitudeSolver* ch = (ChebyshevAmplitudeSolver*)N;
+    for (unsigned int i=0; i<=ch->ChebyshevDegree(); i++)
+    {
+        cout << ch->Coefficient(600, i) << endl;
+    }
+    return 0;
+    */
+
+     /////////////
     
 
     if (mode == GENERATE_DATAFILE)
@@ -283,13 +322,18 @@ int main(int argc, char* argv[])
         GeneratePlots();
     else if (mode==LOGLOG_DERIVATIVE)
         LogLogDerivative();
+    else if (mode==GENERATE_SINGLE_PLOT)
+        SinglePlot();
 
 
-
-    delete N;
+    Clear();
     return 0;
 }
 
+void Clear()
+{
+    delete N;
+}
 
 /*
  * Generate plots, can use any kind of solver
@@ -309,7 +353,7 @@ void GeneratePlots()
         output.open(fname.c_str());
         output << infostr.str();
 
-        for (int i=0; i<ktsqrpoints-1; i++)
+        for (int i=0; i<N->KtsqrPoints()-1; i++)
 		{
 			REAL tmpktsqr = minktsqr*std::pow(ktsqr_mult, i);
 			output << N->N(tmpktsqr, tmpy) << endl;
@@ -330,16 +374,26 @@ void GenerateDataFile()
     output.open(s.str().c_str());
     output << infostr.str();
     cout << "Saving data to file " << s.str() << endl;
-    for (int yind=0; yind <= y_points; yind++)
+
+    // Metadata (see README for the syntax)
+    output << "###" << N->MinKtsqr() << endl;
+    output << "###" << N->KtsqrMultiplier() << endl;
+    output << "###" << ktsqrpoints << endl;
+
+    unsigned int yp = static_cast<int>(maxy/N->DeltaY())+1;
+    
+    
+    for (unsigned int yind=0; yind <= yp; yind++)
     {
-        REAL tmpy = miny + (maxy-miny)/(REAL)(y_points) * yind;
+        //REAL tmpy = miny + (maxy-miny)/(REAL)(y_points) * yind;
+        REAL tmpy = N->Yval(yind);
 
         
         output << "###" << tmpy << endl;
-        output << "# ktsqr    N(ktsqr, y=" << tmpy << ")" << endl;
+        
 		   
 			
-        for (int i=0; i<ktsqrpoints-1; i++)
+        for (int i=0; i<ktsqrpoints; i++)
 		{
 			REAL tmpktsqr = minktsqr*std::pow(ktsqr_mult, i);
 			output << N->N(tmpktsqr, tmpy) << endl;
@@ -365,3 +419,34 @@ void LogLogDerivative()
 		cout << tmpktsqr << " " << N->LogLogDerivative(tmpktsqr, y) << endl;
 	}
 }
+
+/*
+ * Plot amplitude at given rapidity
+ */
+void SinglePlot()
+{
+    cout << "# y=" << y << ", ic=" << N->InitialConditionStr() << endl;
+    cout << "# ktsqr amplitude initial_condition" << endl;
+    for (int i=0; i<N->KtsqrPoints()-1; i+=2)
+    {
+        REAL tmpktsqr = minktsqr*std::pow(ktsqr_mult, i);
+        cout << tmpktsqr << " " << N->N(tmpktsqr, y) << " " <<
+            N->InitialCondition(tmpktsqr) << endl;
+    }
+}
+
+/*
+ * Plot amplitude in r-space at given rapidity
+ */
+
+REAL Inthelperf_ft(REAL ktqr, void* p)
+{
+    
+}
+void SinglePlotR()
+{
+
+
+}
+
+

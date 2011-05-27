@@ -23,7 +23,7 @@ const int Nf=3;
 
 // Other constants
 
-const REAL eps=0.00001; // Epsilon for runge kutta
+const REAL eps=0.000001; // Epsilon for runge kutta
 
 // Inline functions
 

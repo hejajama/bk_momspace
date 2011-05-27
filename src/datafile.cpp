@@ -47,6 +47,10 @@ DataFile::DataFile(string fname)
         }
     }
 
+    //TODO: It's impossible that this condition doesn't hold
+    if (confid < 3)
+        cerr << "File " << fname << " doesn't have enough metadata!" << endl;
+
     // Ok, configurations are read, then read all yvals
     REAL y=-1;
     std::vector<REAL> tmpvec;
@@ -65,7 +69,7 @@ DataFile::DataFile(string fname)
                 {
                     cerr << "File " << fname << ": read " << tmpvec.size() << " ktsqrpoints, but "
                     << "there should have been " << ktsqrpoints << " points, y=" 
-                    << ". " << LINEINFO << endl;
+                    << y << ". " << LINEINFO << endl;
                 }
 
             y = StrToReal(line.substr(3,line.length()-3));

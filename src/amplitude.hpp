@@ -28,7 +28,8 @@ const int INTERPOLATION_POINTS = 10;
 enum INITIAL_CONDITION
 {
     FTIPSAT,    // \int d^2r 1/(2\pi r^2) exp(ik.r) 2(1-exp(-r^2))
-    INVPOWER    // 1/(k^2 + 1), as in BK in full mom. space, hep-ph/0504080
+    INVPOWER,   // 1/(k^2 + 1), as in BK in full mom. space, hep-ph/0504080
+    INVPOWER4   // 1/(k^4+1), very arbitrary
 };
     
 
