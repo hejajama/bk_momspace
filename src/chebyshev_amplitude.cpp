@@ -27,7 +27,7 @@ const int MAXITER_UINT=MAXITER_VINT;
 const REAL UVINTACCURACY=0.001;
 
 const int MAXITER_KIN=1000;
-const REAL KINACCURACY=0.001;
+const REAL KINACCURACY=0.01;
 
 
 const BASIS_BOUNDARY_CONDITION DEFAULT_BC=CHEBYSHEV;
@@ -53,41 +53,48 @@ REAL Integrand_helperu(REAL u, void *p)
     int_helper.function=&Integrand_helperv;
     int_helper.params=h;
     REAL result, abserr;
-    
-    gsl_integration_workspace *workspace 
-     = gsl_integration_workspace_alloc(MAXITER_VINT);
 
-    // Integrate over v with known "singular" point v=u
-    // Actually it is not singularity there, only finite discontinuity
-    // (at least in normal Chebyshev basis?)
-
-    // Problems if u=\pm 1
     REAL maxy=1.0; REAL miny=-1.0;REAL pts[3];
     int status;
-    if (u>1-1e-15 or u<-1+1e-15) {
-        gsl_integration_cquad_workspace * workspace =gsl_integration_cquad_workspace_alloc(1000);
-        status=gsl_integration_cquad(&int_helper,-1+1e-15, 1-1e-15, 0, UVINTACCURACY,
-                workspace, &result, &abserr, NULL);
+
+    if (h->N->KinematicalConstraint()==true)
+    {
+        // Integration limits are [-1,u]
+
+        if (u < -1.0+1e-15)
+            return 0;
+        
+        gsl_integration_cquad_workspace *workspace 
+        = gsl_integration_cquad_workspace_alloc(MAXITER_VINT);
+        status = gsl_integration_cquad(&int_helper, -1.0, u-1e-15, 0,
+            UVINTACCURACY, workspace, &result, &abserr, NULL);
         gsl_integration_cquad_workspace_free(workspace);
     }
-    else
+
+    else    // No kinematical constraint, integrate over v \in [-1,1]
     {
-        pts[1]=u;
-        pts[0]=miny; ; pts[2]=maxy;
-        status = gsl_integration_qagp(&int_helper, pts, 3, 0, UVINTACCURACY,
-            MAXITER_VINT, workspace, &result, &abserr);
-    }
-    gsl_integration_workspace_free(workspace); 
-    /*int status=gsl_integration_qag(&int_helper, -0.999, 0.999, 0, UVINTACCURACY, 
-        MAXITER_UINT, GSL_INTEG_GAUSS21, workspace, &result, &abserr);
-    gsl_integration_workspace_free(workspace);
-    */
-    
-    /*gsl_integration_cquad_workspace * workspace =gsl_integration_cquad_workspace_alloc(200);
-    int status=gsl_integration_cquad(&int_helper,-0.999, 0.999, 0, UVINTACCURACY,
-            workspace, &result, &abserr, NULL);
-    gsl_integration_cquad_workspace_free(workspace);
-    */
+        // Integrate over v with known "singular" point v=u
+        // Actually it is not singularity there, only finite discontinuity
+        // (at least in normal Chebyshev basis?)
+
+        // Problems if u=\pm 1
+        if (u>1-1e-15 or u<-1+1e-15) {
+            gsl_integration_cquad_workspace * workspace =gsl_integration_cquad_workspace_alloc(1000);
+            status=gsl_integration_cquad(&int_helper,-1+1e-15, 1-1e-15, 0, UVINTACCURACY,
+                    workspace, &result, &abserr, NULL);
+            gsl_integration_cquad_workspace_free(workspace);
+        }
+        else
+        {
+            gsl_integration_workspace *workspace 
+            = gsl_integration_workspace_alloc(MAXITER_VINT);
+            pts[1]=u;
+            pts[0]=miny; ; pts[2]=maxy;
+            status = gsl_integration_qagp(&int_helper, pts, 3, 0, UVINTACCURACY,
+                MAXITER_VINT, workspace, &result, &abserr);
+            gsl_integration_workspace_free(workspace);
+        }
+     }
     
     if (status) std::cerr << "Error " << status << " at " << LINEINFO
         << ": Result " << result << ", abserror: " << abserr 
@@ -135,10 +142,10 @@ void ChebyshevAmplitudeSolver::SolveMatrix()
      * (T_n(v) - exp(-delta)T_n(u) ) / Abs(exp(delta)-1)
      * + T_n(u)/Sqrt(1+4*exp(-2*delta)) }
      * here delta = M(u-v)
+     *
+     * If kinematical constraint is applied, limits for vint are
+     * [-1,u], case v>0 is coevered by Kinematic() function
      */
-
-
-
     
 
     mat.clear();
@@ -155,7 +162,7 @@ void ChebyshevAmplitudeSolver::SolveMatrix()
 
     int ready=0;
     #pragma omp parallel for
-    for (unsigned int m=0; m<=chebyshev_degree; m++)
+    for (int m=0; m<=chebyshev_degree; m++)
     //for (unsigned int m=69; m<=69; m++)
     {
         
@@ -170,10 +177,6 @@ void ChebyshevAmplitudeSolver::SolveMatrix()
             int_helper.params=&h;
             h.n=n;
             h.m=m;
-
-            //DEBUG
-            //h.n=5;
-            //h.m=69;
             
             gsl_integration_workspace* workspace
             = gsl_integration_workspace_alloc(MAXITER_UINT);
@@ -298,21 +301,14 @@ void ChebyshevAmplitudeSolver::Solve(REAL maxy)
 {
     REAL alphabar = 0.2;
 
-    /* Compute matrix F_{nm}
+    /* Evolution is derived by matrix F_{nm}
      * = \int_-1^1 dv \int_-1^1 du (1-u^2)^(-1/2) T_m(u) {
      * (T_n(v) - exp(-delta)T_n(u) ) / Abs(exp(delta)-1)
      * + T_n(u)/Sqrt(1+4*exp(-2*delta)) }
      * here delta = M(u-v)
+     * which is computed beforehand. If kinematical constraint is applied,
+     * this integral contains extra constraint \theta(u-v)
      */
-
-    /*for ( int i=-100; i<100; i++)
-    {
-        REAL ktsqr = Ktsqr(i/100.0);
-        cout << ktsqr << " "<< InitialCondition(ktsqr) << " " << N(ktsqr, 0) << endl;
-
-    }
-    return;
-    */
     
 
     // Evolve up to maxy
@@ -323,14 +319,14 @@ void ChebyshevAmplitudeSolver::Solve(REAL maxy)
         if (yvals[i]>maxy)
             { maxyind=i; break; }
     }
-    cout << "# Evolving up to y=" << yvals[maxyind] << endl;
+    cout << "# Evolving up to y=" << yvals[maxyind] << ", M=" << M() << endl;
 
     // \partial y a_m = (M_1+M_2) \alphabar \sum_n a_n f_{nm}
     for (unsigned int yind=1; yind<=maxyind; yind++)
     {
         cerr << "# y=" << yvals[yind] << endl;
         #pragma omp parallel for
-        for (unsigned int aind=0; aind <= chebyshev_degree; aind++)
+        for (int aind=0; aind <= chebyshev_degree; aind++)
         {
             REAL dera=0;
             for (unsigned int tmpind=0; tmpind<= chebyshev_degree; tmpind++)
@@ -343,13 +339,16 @@ void ChebyshevAmplitudeSolver::Solve(REAL maxy)
 
             if (kinematic_constraint)
             {
-                REAL kc=0;
+                REAL kc = Kinematic(aind, yind-1);
+                dera += alphabar*kc;    
+                /*** LO
                 for (unsigned int tmpind=0; tmpind <= chebyshev_degree; tmpind++)
                 {
-                    kc += KinematicLO(aind, tmpind, yind-1);
+                    kc += Kinematic(aind, tmpind, yind-1);
                 }
                 kc *= alphabar;
                 dera -= kc;
+                */
             }
             
             coef[yind][aind]=coef[yind-1][aind] + (yvals[yind]-yvals[yind-1])*dera;
@@ -464,6 +463,7 @@ REAL ChebyshevAmplitudeSolver::NonLinear(unsigned int m, unsigned int yind)
 }
 
 
+
 /*
  * Contribution from the kinematical constraint in lowest order
  * Assume that a(Y) is a smooth, "slowly" varying function
@@ -473,9 +473,6 @@ REAL ChebyshevAmplitudeSolver::NonLinear(unsigned int m, unsigned int yind)
  *
  * Thus we integrate
  * \int_{-1}^1 du (1-u^2)^{-1/2} T_m(u) \int_u^1 dv M(v-u)*T_n(v) / Abs[1-exp[M(u-v)]]
- *
- * This expansion of a(Y) is more or less reasonable, as if (v-u) is large,
- * denominator suppresses the result a lot
  */
 
 struct Inthelper_kinematic
@@ -483,12 +480,16 @@ struct Inthelper_kinematic
     unsigned int n,m;
     REAL u;
     ChebyshevAmplitudeSolver* N;
+    REAL y;
+    uint yind;
+    REAL sum_anTn;  // \sum_n a_n(Y) T_n(u)
 };
 
-REAL Inthelperf_kinematic_v(REAL v, void* p)
+REAL Inthelperf_kinematic_v_lo(REAL v, void* p)
 {
     Inthelper_kinematic* par = (Inthelper_kinematic*)p;
     REAL result=0;
+    
     if (std::abs(par->u - v) < 1e-10)
         result = 1.0;
     else
@@ -498,25 +499,88 @@ REAL Inthelperf_kinematic_v(REAL v, void* p)
 
 }
 
+
+/*
+ * Contribution from the kinematical constraint exactly
+ * In this case the rapiditiy-evolution matrix is computed with
+ * additional constraint \theta(u-v)
+ *
+ * This function computes the contribution which can't be calculated
+ * only once and saved in one matrix
+ * Namely integrates
+ * \int_{-1}^1 du/Sqrt[1-u^2] T_m(u) \int_u^1 dv \sum_n [
+ *  (a_n(Y-M(u-v))T_n(v) - exp(M(u-v))*T_n(u)*a_n(Y) ) /
+ *  |1-exp(M(u-v))| + T_n(u)/Sqrt[1+4*exp(-2*M*(u-v)) ] ]
+ *
+ * 1/Sqrt[1-u^2] has been taken into account in integral over u
+ */
+
+
+
+REAL Inthelperf_kinematic_v(REAL v, void* p)
+{
+    Inthelper_kinematic* par = (Inthelper_kinematic*)p;
+    REAL result=0;
+
+    if (std::abs(par->u - v) < 1e-15)
+        return 0.0;
+
+    // \sum_n a_n(Y-M(v-u)) T_n(v)
+    // Note: Coefficient(y<0) = Coefficient(y=0)
+    REAL nonlocalsum=0;
+    for (uint i=0; i<=par->N->ChebyshevDegree(); i++)
+    {
+        nonlocalsum += par->N->CoefficientY(par->y - par->N->M()*(v - par->u), i )
+                    * par->N->Basis(i, v);
+    }
+
+    /*if (std::abs(par->u-v)<1e-6)
+        cerr << "u=" << par->u << ", v=" << v <<", sum=" << par->sum_anTn
+            <<", nonlocsum=" << nonlocalsum << ", y=" << par->y << endl;
+*/
+    result = (nonlocalsum - std::exp( par->N->M()*(par->u - v) )*par->sum_anTn)
+        /std::abs( 1.0-std::exp(par->N->M()*(par->u - v)) )
+        + par->sum_anTn/std::sqrt( 1.0 + 4.0*std::exp(-2.0*par->N->M()*(par->u - v)) );
+    return result;
+
+
+}
+
 REAL Inthelperf_kinematic_u(REAL u, void * p)
 {
     gsl_integration_workspace* workspace = gsl_integration_workspace_alloc(MAXITER_KIN);
-    ((Inthelper_kinematic*)p)->u=u;
+    Inthelper_kinematic* par = (Inthelper_kinematic*)p;
+    par->u=u;
     gsl_function int_helper;
     int_helper.function=&Inthelperf_kinematic_v;
     int_helper.params=p;
 
+    //// Not needed in lo
+    if (u> 1.0 - 1e-15) return 0;
+    REAL sum = 0;
+    for (uint i=0; i<=par->N->ChebyshevDegree(); i++)
+    {
+        sum += par->N->Coefficient(par->yind, i) * par->N->Basis(i, u);
+    }
+    par->sum_anTn=sum;
+    ////
+
     REAL result, abserr;
 
-    int status = gsl_integration_qag(&int_helper, u, 1.0, 0, KINACCURACY,
+    int status = gsl_integration_qag(&int_helper, u+1e-15, 1.0, 0, KINACCURACY,
         MAXITER_KIN, GSL_INTEG_GAUSS21, workspace, &result, &abserr);
 
     if (status)
     {
         cerr << "v-integration failed at " << LINEINFO << ", code " << status
-            << ", u=" << u << ", n=" << ((Inthelper_kinematic*)p)->n
+            << ", u=" << u /* << ", n=" << ((Inthelper_kinematic*)p)->n */
             << ", m=" << ((Inthelper_kinematic*)p)->m << ", result: " << result
             << ", relerr " << std::abs(abserr/result) << endl;
+            /*
+            for (REAL x=u; x<=1.0; x+=0.001)
+                cout << x << " " << Inthelperf_kinematic_v(x, par) << endl;
+            exit(1);
+            */
     }
     
     gsl_integration_workspace_free(workspace);
@@ -525,15 +589,10 @@ REAL Inthelperf_kinematic_u(REAL u, void * p)
     
     return result;
 }
-
-
  
-REAL ChebyshevAmplitudeSolver::KinematicLO(unsigned int m, unsigned int n,
+REAL ChebyshevAmplitudeSolver::Kinematic(unsigned int m,
     unsigned int yind)
 {
-
-    if (yind<1)
-        return 0.0; // Assume that a'_0(Y)=0
     
     REAL result, abserr;
     // Weight function (1-x^2)^(-1/2) = [ (1-x)*(1+x) ]^(-1/2)
@@ -544,8 +603,9 @@ REAL ChebyshevAmplitudeSolver::KinematicLO(unsigned int m, unsigned int n,
     
     Inthelper_kinematic helper;
     helper.N=this;
-    helper.n=n;
     helper.m=m;
+    helper.y=yvals[yind];
+    helper.yind=yind;
 
     gsl_function int_helper;
     int_helper.function=&Inthelperf_kinematic_u;
@@ -554,10 +614,10 @@ REAL ChebyshevAmplitudeSolver::KinematicLO(unsigned int m, unsigned int n,
     int status = gsl_integration_qaws( &int_helper, -1.0, 1.0, table,
         0, KINACCURACY, MAXITER_KIN, workspace, &result, &abserr);
 
-    if (status)
+    if (status and result>1e-3 )
     {
         cerr << "u-integration failed at " << LINEINFO << ", code " << status
-            << ", n=" << n
+            /* << ", n=" << n */
             << ", m=" << m << ", result: " << result
             << ", relerr " << std::abs(abserr/result) << endl;
     }
@@ -565,11 +625,12 @@ REAL ChebyshevAmplitudeSolver::KinematicLO(unsigned int m, unsigned int n,
     gsl_integration_workspace_free(workspace);
     gsl_integration_qaws_table_free(table);
 
-    result *= M2();
+    result *= M();
 
+    //// LO ONLY
     // Then multiply by a_n'(Y)
-    REAL dera = (coef[yind][n] - coef[yind-1][n])/(yvals[yind]-yvals[yind-1]);
-    result *= dera;
+    // REAL dera = (coef[yind][n] - coef[yind-1][n])/(yvals[yind]-yvals[yind-1]);
+    // result *= dera;
     
     return result;
 }
@@ -790,6 +851,11 @@ REAL ChebyshevAmplitudeSolver::M2()
     return m2;
 }
 
+REAL ChebyshevAmplitudeSolver::M()
+{
+    return m2;
+}
+
 REAL ChebyshevAmplitudeSolver::Ktsqr(REAL u)
 {
     // Comput ktsqr from u
@@ -883,4 +949,46 @@ REAL ChebyshevAmplitudeSolver::MaxKtsqr()
 REAL ChebyshevAmplitudeSolver::Coefficient( unsigned int yind, unsigned int degree)
 {
     return coef[yind][degree];
+}
+
+
+/*
+ * Coefficient a(Y) as a function of Y
+ * Interpolates linearly in Y
+ * if Y<0 returns a(0)
+ */
+
+REAL ChebyshevAmplitudeSolver::CoefficientY(REAL y, uint degree)
+{
+    if (y<0.00001)
+        return Coefficient(0, degree);
+    
+    // Find yind so that yvals[yind]<y and yvals[yind+1]>y
+    int yind=-1;
+    for (uint i=0; i<yvals.size()-1; i++)
+    {
+        if (yvals[i]<=y and yvals[i+1]>y)
+        {
+            yind=i;
+            break;
+        }
+    }
+    if (yind==-1)   // Didn't find, fall back to y=yind[yvals-1]
+    {
+        if (std::abs(y - yvals[yvals.size()-1]) > 0.05)
+        {
+            cerr << LINEINFO  << ": Asked Coefficient of degree " << degree << " at too large"
+                << " value of y=" << y <<", falling back to y="
+                << yvals[yvals.size()-1] << endl;
+        }
+        return Coefficient(yvals.size()-1, degree);
+
+    }
+
+    // Interpolate linearly
+    return Coefficient(yind, degree) +
+        (y-yvals[yind])* ( Coefficient(yind+1, degree) - Coefficient(yind, degree) )
+        / (yvals[yind+1] - yvals[yind] ) ;
+    
+
 }

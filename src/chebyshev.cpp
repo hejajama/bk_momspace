@@ -103,7 +103,7 @@ void ChebyshevVector::Normalize()
 
 REAL ChebyshevVector::Evaluate(REAL x)
 {
-    if (std::abs(x)>1)
+    if (std::abs(x)>1.00000000001)
     {
         cerr << "Asked the value of Chebyshev polynomial at x=" << x << " "
         << LINEINFO << endl;

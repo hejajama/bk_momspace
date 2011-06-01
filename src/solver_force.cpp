@@ -89,7 +89,7 @@ REAL inthelperf_bkmom_constraint(REAL ktsqr, void* p)
     inthelper_bkmom* par = (inthelper_bkmom*) p;
 
     REAL result=0;
-    if (abs(ktsqr - par->ktsqr) < 1e-14)
+    if (abs(ktsqr - par->ktsqr) < 1e-18)
     {
         cerr << "ktsqr \\approx par->ktsqr and we can't handle this! y=" << par->y
             << " par->ktsqr=" << par->ktsqr << " at " << LINEINFO << endl;

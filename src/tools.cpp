@@ -35,10 +35,16 @@ void ErrHandler(const char * reason,
                         int line,
                         int gsl_errno)
 {
+    
+    // Errors related to convergence of integrals are handled when
+    // gsl_integration functions are called, don't do anything with them here
+     // 14 = failed to reach tolerance
+     // 18 = roundoff error prevents tolerance from being achieved
+    if (gsl_errno == 14 or gsl_errno == 18)
+        return;
+
     errors++;
-    if (gsl_errno !=14  )  // 14 = failed to reach tolerance, handle when gsl_int 
-                    // is called
-        std::cerr << file << ":"<< line <<": Error " << errors << ": " <<reason
+    std::cerr << file << ":"<< line <<": Error " << errors << ": " <<reason
             << " (code " << gsl_errno << ")." << std::endl;
 }
 

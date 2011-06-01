@@ -16,6 +16,7 @@ using std::endl;
 using std::string;
 
 typedef double REAL;
+typedef unsigned int uint;
 
 // Physical constants
 const REAL LAMBDAQCD2 = 0.21416*0.21416;   // GeV^2

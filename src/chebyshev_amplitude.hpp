@@ -39,13 +39,15 @@ class ChebyshevAmplitudeSolver : public Amplitude
         REAL NonLinear(unsigned int m, unsigned int yind); 
 
         // Contribution from kinematical constarint (lowest order)
-        REAL KinematicLO(unsigned int m, unsigned int n, unsigned int yind);
+      //  REAL KinematicLO(unsigned int m, unsigned int n, unsigned int yind);
+        REAL Kinematic(unsigned int m, unsigned int yind);
         
 
         REAL N(REAL ktsqr, REAL y);
 
         REAL M1();
         REAL M2();
+        REAL M();
         REAL Ktsqr(REAL u);
         REAL U(REAL ktsqr);
 
@@ -54,6 +56,7 @@ class ChebyshevAmplitudeSolver : public Amplitude
         void SetBoundaryCondition(BASIS_BOUNDARY_CONDITION bc);
 
         REAL Coefficient( unsigned int yind, unsigned int degree);
+        REAL CoefficientY( REAL y, uint degree);
 
         REAL MinKtsqr();
         REAL MaxKtsqr();

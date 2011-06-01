@@ -24,12 +24,14 @@ const REAL DEFAULT_MAXKTSQR = 1e10; // orig: 1e10
 const REAL KTSQRINTACCURACY = 0.005;
 const int KTSQRINTITERATIONS = 9000;
 const int INTERPOLATION_POINTS = 10;
+const int INTERPOLATION_POINTS_DER=50;
 
 enum INITIAL_CONDITION
 {
     FTIPSAT,    // \int d^2r 1/(2\pi r^2) exp(ik.r) 2(1-exp(-r^2))
     INVPOWER,   // 1/(k^2 + 1), as in BK in full mom. space, hep-ph/0504080
-    INVPOWER4   // 1/(k^4+1), very arbitrary
+    INVPOWER4,  // 1/(k^4+1), very arbitrary
+    GAUSS       // Exp[-(Log[k^2] + 2)^2/5], hep-ph/0110325
 };
     
 
@@ -58,6 +60,7 @@ class Amplitude
         REAL Yval(unsigned int i);
         void SetInitialCondition(INITIAL_CONDITION i);
         void SetKinematicConstraint(bool kc);
+        bool KinematicalConstraint();
         string InitialConditionStr();
         void SetNumberOfAveragements(int avg);
 
@@ -77,6 +80,9 @@ class Amplitude
         REAL InitialCondition(REAL ktsqr);  // N() at y=0
         
     protected:
+
+        REAL BSplineDerivative(REAL ktsqr, REAL* ktsqrarray, REAL* narray, uint points);
+    
         // n[ktsqr][y]
         std::vector< std::vector<REAL> > n;
 

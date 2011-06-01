@@ -54,6 +54,7 @@ Amplitude* N;
 REAL minktsqr=DEFAULT_MINKTSQR;
 REAL maxktsqr = DEFAULT_MAXKTSQR;
 REAL ktsqr_mult = DEFAULT_KTSQR_MULTIPLIER;
+uint ktsqrpoints;
 REAL y = 0;
 REAL miny = 0.0;
 REAL maxy = 0.0;
@@ -89,10 +90,12 @@ void Clear();
 int main(int argc, char* argv[])
 {
     // Print the cmdline args
-    cout << "# ";
+    std::stringstream cmdline;
+    cmdline << "# ";
     for (int i=0; i<argc; i++)
-        cout << argv[i] << " " ;
-    cout << endl;
+        cmdline << argv[i] << " " ;
+    cmdline << endl;
+    cout << cmdline.str();
 
     gsl_set_error_handler(&ErrHandler);
 
@@ -106,7 +109,7 @@ int main(int argc, char* argv[])
         cout << "-output [prefix]: set output file prefix, filenames are prefix_y[rapidity].dat" << endl;
         cout << "-miny, -maxy: rapidity values to solve" << endl;
         //cout << "-minktsqr, -maxktsqr: range of k_T^2 to plot, doesn't affect to limits when solving BK" << endl;
-        cout << "-ic [initial condition]: set initial condition, possible ones are FTIPSAT, INVPOWER, INVPOWER4 " << endl;
+        cout << "-ic [initial condition]: set initial condition, possible ones are FTIPSAT, INVPOWER, INVPOWER4, GAUSS " << endl;
         cout << "-kc: apply kinematical constraint" << endl;
         cout << "-avg [avgs]: number or averagements" << endl;
         cout << "-data [datafile]: read data from datafiles from path datafile_y[rapdity].dat" << endl;
@@ -114,6 +117,7 @@ int main(int argc, char* argv[])
         cout << "-y [yval]: rapidity value for e.g. loglog derivative" << endl;
         cout << "-load_matrix [filename], -save_matrix [filename]: load/save coefficient matrix (CHEBYSHEV method)" << endl;
         cout << "-chebyshev_degree [number]: number of basis vectors" << endl;
+        cout << "-minktsqr [val], -maxktsqr [val], -ktsqrpoints [val]" << endl;
         return 0;
     }
 
@@ -146,6 +150,12 @@ int main(int argc, char* argv[])
             maxdatay = StrToInt(argv[i+1]);
         else if (string(argv[i])=="-delta_datay")
             delta_datay = StrToReal(argv[i+1]);
+        else if (string(argv[i])=="-minktsqr")
+            minktsqr = StrToReal(argv[i+1]);
+        else if (string(argv[i])=="-maxktsqr")
+            maxktsqr = StrToReal(argv[i+1]);
+        else if (string(argv[i])=="-ktsqrpoints")
+            ktsqrpoints = StrToInt(argv[i+1]);
         else if (string(argv[i])=="-load_matrix")
         {
             cheb_matrix = LOAD;
@@ -168,6 +178,8 @@ int main(int argc, char* argv[])
                 ic = INVPOWER;
             else if (string(argv[i+1])=="INVPOWER4")
                 ic = INVPOWER4;
+            else if (string(argv[i+1])=="GAUSS")
+                ic = GAUSS;
             else
             {
                 cerr << "Unrecognized initial condition " << argv[i+1] << ", exiting..." << endl;
@@ -221,6 +233,10 @@ int main(int argc, char* argv[])
     N->SetKinematicConstraint(kc);
     N->SetMaxY(maxy);
     N->SetMaxKtsqr(maxktsqr);
+    N->SetMinKtsqr(minktsqr);
+    N->SetKtsqrMultiplier( std::pow( maxktsqr/minktsqr,
+        1.0/static_cast<REAL>(ktsqrpoints) ) );
+    
     if (N->YPoints()<2 and method==BRUTEFORCE and mode==GENERATE_DATAFILE)
     {
         cerr << "There must be at least 3 ypoints to evaluate " << endl;
@@ -228,8 +244,9 @@ int main(int argc, char* argv[])
     }
     N->Initialize();
 
-    int ktsqrpoints = N->KtsqrPoints();
+    ktsqrpoints = N->KtsqrPoints();
 
+    infostr << cmdline.str();
     infostr << "# Yrange [" << miny << ", " << maxy << "], k_T^2 limits for "
         << "output are [" << minktsqr << ", " << maxktsqr << "]" << endl;
 
