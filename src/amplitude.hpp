@@ -9,6 +9,8 @@
 #include "config.hpp"
 #include <vector>
 #include <cmath>
+#include <gsl/gsl_bspline.h>
+#include <gsl/gsl_multifit.h>
 //#include <bci.h>
 
 const REAL DEFAULT_DELTA_Y=0.1;
@@ -24,7 +26,7 @@ const REAL DEFAULT_MAXKTSQR = 1e10; // orig: 1e10
 const REAL KTSQRINTACCURACY = 0.005;
 const int KTSQRINTITERATIONS = 9000;
 const int INTERPOLATION_POINTS = 10;
-const int INTERPOLATION_POINTS_DER=50;
+const int INTERPOLATION_POINTS_DER=200;
 
 enum INITIAL_CONDITION
 {
@@ -39,6 +41,7 @@ class Amplitude
 {
     public:
         Amplitude();
+        ~Amplitude();
         void Initialize();
 		void Clear();
 
@@ -46,7 +49,10 @@ class Amplitude
         // to compute the amplitude (e.g. ChebyshevAmplitudeSolver), and
         // in that case they may not use n[][]-table or AddDataPoint-routines
         // at all!
-        virtual REAL N(REAL ktsqr, REAL y);
+        virtual REAL N(REAL ktsqr, REAL y, bool bspline=false);
+        void IntializeBSpline(int ktsqrind, REAL rapidity);
+        REAL BSplineAmplitude(REAL ktsqr, REAL rapidity);
+        //REAL BSplineAmplitude(REAL ktsqr, REAL *ktsqrarray, REAL *narray, uint points);
         void AddDataPoint(int ktsqrindex, int yindex, REAL value, REAL der);
         
         REAL LogLogDerivative(REAL ktsqr, REAL y);
@@ -69,6 +75,9 @@ class Amplitude
         void SetKtsqrMultiplier(REAL m);
         void SetMaxY(REAL y);
         void SetDeltaY(REAL dy);
+
+        void SetRunningCoupling(bool rc);
+        bool RunningCoupling();
 
         unsigned int YPoints();
         unsigned int KtsqrPoints();
@@ -102,10 +111,23 @@ class Amplitude
         REAL maxy;
         REAL delta_y;
 
+        bool running_coupling;
+
         bool datafile;	// True if data is read from external file
 
         bool adams_method;   // Whether the Adams method should be used when solvin DE
-        
+
+        // Bspline interpolation
+        REAL bspline_y;
+        gsl_bspline_workspace *bw;
+        gsl_vector *B;
+        gsl_vector *c;
+        gsl_matrix *X;
+        gsl_matrix *cov;
+        gsl_multifit_linear_workspace *mw;
+        int interpolation_start;    // These values are used to cache interpolation
+        int interpolation_end;
+        REAL interpolation_rapidity;
         
 };
 

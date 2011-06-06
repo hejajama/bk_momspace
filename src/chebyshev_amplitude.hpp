@@ -43,7 +43,7 @@ class ChebyshevAmplitudeSolver : public Amplitude
         REAL Kinematic(unsigned int m, unsigned int yind);
         
 
-        REAL N(REAL ktsqr, REAL y);
+        REAL N(REAL ktsqr, REAL y, bool bspline=false);
 
         REAL M1();
         REAL M2();

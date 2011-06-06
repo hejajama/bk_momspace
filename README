@@ -37,6 +37,7 @@ and so on.
 
 Matrix used in ChebyhsevAmplitudeSolver is saved in format
 ###dimension
+###M
 F_0,0
 F_0,1
 F_0,2

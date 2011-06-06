@@ -21,6 +21,10 @@ typedef unsigned int uint;
 // Physical constants
 const REAL LAMBDAQCD2 = 0.21416*0.21416;   // GeV^2
 const int Nf=3;
+const int Nc=3;
+
+// Reqularization of the running coupling
+const REAL MAXALPHA = 0.3;  // Berger&Stasto 1010.0671
 
 // Other constants
 

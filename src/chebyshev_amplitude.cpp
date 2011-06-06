@@ -30,7 +30,7 @@ const int MAXITER_KIN=1000;
 const REAL KINACCURACY=0.01;
 
 
-const BASIS_BOUNDARY_CONDITION DEFAULT_BC=CHEBYSHEV;
+const BASIS_BOUNDARY_CONDITION DEFAULT_BC=CHEBYSHEV_ZERO;
 
 
 
@@ -78,7 +78,7 @@ REAL Integrand_helperu(REAL u, void *p)
         // (at least in normal Chebyshev basis?)
 
         // Problems if u=\pm 1
-        if (u>1-1e-15 or u<-1+1e-15) {
+        if (u>1-1e-15 or u<-1+1e-15 ) {
             gsl_integration_cquad_workspace * workspace =gsl_integration_cquad_workspace_alloc(1000);
             status=gsl_integration_cquad(&int_helper,-1+1e-15, 1-1e-15, 0, UVINTACCURACY,
                     workspace, &result, &abserr, NULL);
@@ -163,7 +163,6 @@ void ChebyshevAmplitudeSolver::SolveMatrix()
     int ready=0;
     #pragma omp parallel for
     for (int m=0; m<=chebyshev_degree; m++)
-    //for (unsigned int m=69; m<=69; m++)
     {
         
         for (unsigned int n=0; n<=chebyshev_degree; n++)
@@ -224,8 +223,10 @@ void ChebyshevAmplitudeSolver::SaveMatrix(std::string file)
     stream <<"# Basis is " << boundary_condition << " (1=normal chebyshev, 2=boundary cond. E(1)=0"
         << endl;
     stream << std::setprecision(9) << "#M1=" << M1() << ", M2=" <<
-        std::setprecision(9) << M2() << ", maxktsqr=" << MaxKtsqr() << endl;
+        std::setprecision(9) << M2() << ", minktsqr=" << MinKtsqr()
+            << ", maxktsqr=" << MaxKtsqr() << endl;
     stream <<"###" << chebyshev_degree << endl;
+    stream <<"###" << std::setprecision(9) << M2() << endl;
 
     for (unsigned int m=0; m<=chebyshev_degree; m++)
     {
@@ -244,6 +245,7 @@ void ChebyshevAmplitudeSolver::LoadMatrix(std::string file)
     std::ifstream stream;
     stream.open(file.c_str());
     mat.clear();
+    int setting=0;
     while (!stream.eof())
     {
         std::string line;
@@ -252,8 +254,17 @@ void ChebyshevAmplitudeSolver::LoadMatrix(std::string file)
         // Dimension
         if (line.substr(0,3)=="###")
         {
-            chebyshev_degree = StrToInt(line.substr(3,line.length()-3));
-            break;
+            if (setting==0)
+                chebyshev_degree = StrToInt(line.substr(3,line.length()-3));
+            if (setting==1)
+            {
+                m2 = StrToReal(line.substr(3, line.length()-3));
+                maxktsqr = std::exp(m2);
+                minktsqr = std::exp(-m2);
+            }
+            setting++;
+            if (setting>1)
+                break;
         }
     }
 
@@ -349,6 +360,13 @@ void ChebyshevAmplitudeSolver::Solve(REAL maxy)
                 kc *= alphabar;
                 dera -= kc;
                 */
+            }
+
+            REAL newcoef = coef[yind-1][aind] + (yvals[yind]-yvals[yind-1])*dera;
+            if (std::abs( (coef[yind-1][aind] - newcoef) / coef[yind-1][aind]) > 0.1)
+            {
+                cerr << "Large change from " << coef[yind-1][aind] << " to " << newcoef
+                    << " at aind=" << aind <<", yind=" << yind << endl;
             }
             
             coef[yind][aind]=coef[yind-1][aind] + (yvals[yind]-yvals[yind-1])*dera;
@@ -682,6 +700,18 @@ void ChebyshevAmplitudeSolver::Prepare()
     }
     cout << ")" << endl;
 
+
+    ///DEBUG
+   for (REAL u=-1; u<=1; u+=0.01)
+    {
+        REAL tmpres=0;
+        for (int i=0; i<=chebyshev_degree; i++)
+            tmpres += coef[0][i]*Basis(i, u);
+        cout << Ktsqr(u) << " " << tmpres << " " << InitialCondition(Ktsqr(u)) << endl; 
+    }
+    exit(1);
+    
+
 }
 
 /*
@@ -745,7 +775,7 @@ void ChebyshevAmplitudeSolver::ComputeBasisVectors()
  * Interpolates between rapidites linearly (TODO: spline?)
  * Or interpolate coefficients?
  */
-REAL ChebyshevAmplitudeSolver::N(REAL ktsqr, REAL y)
+REAL ChebyshevAmplitudeSolver::N(REAL ktsqr, REAL y, bool bspline)
 {
     // Find yind
     // val[index]  is smaller than (or equal) y

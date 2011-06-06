@@ -50,8 +50,8 @@ REAL inthelperf_bkmom_noconstraint(REAL ktsqr, void* p)
 
     if (std::abs(ktsqr - par->ktsqr) < 1e-14)
     {
-        cerr << "ktsqr \\approx par->ktsqr and we can't handle this! y=" << par->y
-           << " par->ktsqr=" << par->ktsqr << " ktsqr: " << ktsqr << endl;
+        //cerr << "ktsqr \\approx par->ktsqr and we can't handle this! y=" << par->y
+        //   << " par->ktsqr=" << par->ktsqr << " ktsqr: " << ktsqr << " " << LINEINFO << endl;
             /*// Computed analytically
             result += GSL_SIGN(ktsqr - par->ktsqr)*(par->N->N(par->ktsqr, par->y) - exp(par->ktsqr/4.0));
             cout << "result " << result << " instead of " <<
@@ -113,7 +113,10 @@ REAL inthelperf_bkmom_constraint(REAL ktsqr, void* p)
 
 REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y)
 {
-    REAL alphabar = 0.2;    //TODO
+    REAL alphabar=0.2;
+    if (RunningCoupling())
+        alphabar = Alpha_s(ktsqr)*Nc/M_PI;
+    
     inthelper_bkmom inthelp;
     inthelp.N=this;
     inthelp.y=y;
@@ -136,7 +139,7 @@ REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y)
     if (ktsqr>ktsqrvals[0] and ktsqr<ktsqrvals[ktsqrvals.size()-2] and true==false)
     {
         REAL range[3]; range[0]=ktsqrvals[0];
-        range[1]=ktsqr; range[2]=ktsqrvals[ktsqrvals.size()-2];
+        range[1]=ktsqr; range[2]=ktsqrvals[ktsqrvals.size()-1];
         status = gsl_integration_qagp(&int_helper, range, 3, 0, KTSQRINTACCURACY,
             KTSQRINTITERATIONS, workspace, &result, &abserr);
     } else
@@ -174,7 +177,7 @@ void BruteForceSolver::Solve(REAL maxy)
         // Solve N(y+DELTA_Y, kt) for every kt
 
 #pragma omp parallel for
-        for (unsigned int ktsqrind=0; ktsqrind<KtsqrPoints(); ktsqrind++)
+        for (int ktsqrind=0; ktsqrind<KtsqrPoints(); ktsqrind++)
         {
             REAL tmpkt = ktsqrvals[ktsqrind];
             REAL dy = yvals[yind]-yvals[yind-1];
@@ -216,7 +219,7 @@ void BruteForceSolver::Solve(REAL maxy)
             ///TODO: Different iterations are not independent, but the difference
             /// caused by different order of execution should be higher order?
 #pragma omp parallel for
-            for (unsigned int ktsqrind=0; ktsqrind<KtsqrPoints()-1; ktsqrind++)
+            for (int ktsqrind=0; ktsqrind<KtsqrPoints()-1; ktsqrind++)
             {
                 REAL tmpkt = ktsqrvals[ktsqrind];
                 REAL tmpder = RapidityDerivative(tmpkt, yvals[yind]);

@@ -32,6 +32,11 @@ Amplitude::Amplitude()
     averages=0;
     datafile=false;
     adams_method=false;
+    interpolation_end=-1;
+    interpolation_start=-1;
+    interpolation_rapidity=-1.0;
+
+    running_coupling = false;
 }
 
 /*
@@ -82,7 +87,7 @@ void Amplitude::Initialize()
  * Compute amplitude from the tabulated values
  */
 
-REAL Amplitude::N(REAL ktsqr, REAL y)
+REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline)
 {
     
     if (y<eps and datafile==false) return InitialCondition(ktsqr);
@@ -166,6 +171,12 @@ REAL Amplitude::N(REAL ktsqr, REAL y)
 		
 			
     }
+
+    /*if (bspline==true)
+    {
+        REAL n = BSplineAmplitude(ktsqr, tmparray, tmpxarray, interpo_points);
+        return n;
+    }*/
     
     gsl_interp_accel *acc = gsl_interp_accel_alloc();
     gsl_spline *spline = gsl_spline_alloc(gsl_interp_cspline, interpo_points);
@@ -176,15 +187,14 @@ REAL Amplitude::N(REAL ktsqr, REAL y)
     if (status)
     {
         cerr << "Interpolatioin failed at " << LINEINFO << ", error " << gsl_strerror(status)
-         << " (" << status << ")" << endl;
+         << " (" << status << "), ktsqr=" << ktsqr << ", y=" << y << endl;
     }
     gsl_spline_free(spline);
     gsl_interp_accel_free(acc);
     delete[] tmparray;
     delete[] tmpxarray;
     //return res;
-
-   /* 
+    /*
     REAL linear = n[ktsqrind][yind] +
         (ktsqr - ktsqrvals[ktsqrind]) *
             (n[ktsqrind+1][yind] - n[ktsqrind][yind]) / (ktsqrvals[ktsqrind+1] - ktsqrvals[ktsqrind]);
@@ -194,7 +204,7 @@ REAL Amplitude::N(REAL ktsqr, REAL y)
 
     if (std::abs(res-linear)/res > 0.5 and linear>eps)
 		cerr << "At ktsqr=" << ktsqr << ", y=" << y << " reldifference " << std::abs(res-linear)/res << endl;
-    //return linear;
+    return linear;
     */
     return res;
     
@@ -220,7 +230,8 @@ void Amplitude::AddDataPoint(int ktsqrindex, int yindex, REAL value, REAL der)
             << LINEINFO << endl;
         return;
     }
-    /*if (n[ktsqrindex][yindex]>=-eps)
+    /*if (n[ktsqrindex][yindex]>    REAL n1,n2;
+    
         cerr << "Overwriting data, ktindex = " << ktsqrindex << ", yindex = "
             << yindex << ". " << LINEINFO << endl; */
     n[ktsqrindex][yindex]=value;
@@ -251,6 +262,17 @@ REAL Derivhelperf_loglog(REAL lnktsqr, void* p)
 
 REAL Amplitude::LogLogDerivative(REAL ktsqr, REAL rapidity)
 {
+
+    //if (std::abs(rapidity-bspline_y)>0.001)
+    //    IntializeBSpline(rapidity);
+
+    REAL n1,n2;
+    n1 = BSplineAmplitude(ktsqr, rapidity);
+    n2 = BSplineAmplitude(ktsqr+ktsqr/100.0, rapidity);
+    
+
+   return ktsqr/n1*(n2-n1)/(ktsqr/100.0);
+    
     /* Lowest order, not very accurate 
     REAL epsilon = ktsqr/1000.0;
     return ktsqr/epsilon*log(N(ktsqr+epsilon,y)/N(ktsqr, y) );
@@ -261,7 +283,6 @@ REAL Amplitude::LogLogDerivative(REAL ktsqr, REAL rapidity)
     REAL lnktsqr = std::log(ktsqr);
     REAL h = lnktsqr/100.0;
 
-    // GSL
     REAL result,abserr;
     Derivhelper_loglog helper;
     helper.y=y; helper.N=this;
@@ -278,22 +299,27 @@ REAL Amplitude::LogLogDerivative(REAL ktsqr, REAL rapidity)
     }
     
     return result;
-    */
+    */   
 
-    // GSL BSPLINE
-    
-    /* allocate a cubic bspline workspace (k = 4) */
-// Keep y fixed, interpolate ktsqr
-    // Interpolate only INTERPOLATION_POINTS points in order to make this
-    // almost fast
-    // Interpolate linearly in y and use spline in ktsqr
+}
 
-    if (rapidity<eps) rapidity=0;
+void Amplitude::IntializeBSpline(int ktsqrind, REAL rapidity)
+{
+    // Not first time -> free old memory
+    if (interpolation_rapidity>=0.0)
+    {
+        gsl_bspline_free(bw);
+        gsl_vector_free(B);
+        gsl_matrix_free(X);
+        gsl_vector_free(c);
+        
+        gsl_matrix_free(cov);
+        gsl_multifit_linear_free(mw);
+    }
     
     // Find ktsqrval and yval indexes refer to index for which
     // val[index]  is smaller than (or equal) y/ktsqr
     int yind = -1;
-    int ktsqrind=-1;
     for (unsigned int i=0; i<yvals.size()-1; i++)
     {
         if (yvals[i]<=rapidity and yvals[i+1]>rapidity)
@@ -309,24 +335,7 @@ REAL Amplitude::LogLogDerivative(REAL ktsqr, REAL rapidity)
             cerr << "Asked derivative at too large Y=" << rapidity << ", falling back to "
                 << " y=" << yvals[yind] << ". " << LINEINFO << endl;
     }
-    for (unsigned int i=0; i<ktsqrvals.size()-1; i++)
-    {
-        if (ktsqrvals[i]<=ktsqr and ktsqrvals[i+1]>ktsqr)
-        {
-            ktsqrind=i;
-            break;
-        }
-    }
-    if (ktsqrind < 0) // Didn't find, so refers to the largest one 
-    {
-        ktsqrind=ktsqrvals.size()-1;
-        if (ktsqr - ktsqrvals[ktsqrvals.size()-1] > 100)
-            cerr << "Asked derivative at too large ktsqr=" << ktsqr << ", falling back to "
-                << " ktsqr=" << ktsqrvals[ktsqrind] << ". " << LINEINFO << endl;
-    }
-
-    unsigned int interpolation_start, interpolation_end;
-   
+    
     if (ktsqrind - INTERPOLATION_POINTS_DER/2 < 0)
     {
 		interpolation_start=0;
@@ -344,115 +353,151 @@ REAL Amplitude::LogLogDerivative(REAL ktsqr, REAL rapidity)
 	}
 	int interpo_points = interpolation_end - interpolation_start+1;
 
-    REAL *tmpxarray = new REAL[interpo_points];
-    REAL *tmpyarray = new REAL[interpo_points];
+
+    gsl_vector *x, *y, *w;
+    x = gsl_vector_alloc(interpo_points);
+    y = gsl_vector_alloc(interpo_points);
+    w = gsl_vector_alloc(interpo_points);
 
     for (int i=interpolation_start; i<= interpolation_end; i++)
     {
 		//tmpxarray[i-interpolation_start]=ktsqrvals[i];
+        gsl_vector_set(x, i-interpolation_start, ktsqrvals[i]);
+        
+        gsl_vector_set(w, i-interpolation_start, 1.0);
 
-        tmpxarray[i-interpolation_start]=ktsqrvals[i];
+        //tmpxarray[i-interpolation_start]=ktsqrvals[i];
         REAL tmpy;
 		
 		if (n[ktsqrind][yind+1]>-eps and rapidity-yvals[yind]>eps)
         {	// Interpolate in y linearly
 			tmpy=n[i][yind] 
 			 + (rapidity - yvals[yind]) * (n[i][yind+1] - n[i][yind]) / (yvals[yind+1]-yvals[yind]); 
-		} 
-		else
-			tmpy = n[i][yind];
-        tmpyarray[i-interpolation_start]=tmpy;
+		}
+        else
+            tmpy = n[i][yind];
+        gsl_vector_set(y, i-interpolation_start, tmpy);
     }
-
-    REAL der = BSplineDerivative(ktsqr, tmpxarray, tmpyarray, interpo_points);
-    delete[] tmpxarray;
-    delete[] tmpyarray;
-    return der;
-
-   
-
-}
-
-
-REAL Amplitude::BSplineDerivative(REAL ktsqr, REAL* ktsqrarray, REAL* narray, uint points)
-{
-    gsl_vector *x, *y, *w;
-    x = gsl_vector_alloc(points);
-    y = gsl_vector_alloc(points);
-    w = gsl_vector_alloc(points);
-    for (uint i=0; i<points; i++)
-    {
-        gsl_vector_set(x, i, ktsqrarray[i]);
-        gsl_vector_set(y, i, narray[i]);
-    }
-
+    
     const int ncoeffs = 12;
     const int nbreak = ncoeffs-2; // k=4
+     
+    /* allocate a cubic bspline workspace (k = 4) */
+    bw = gsl_bspline_alloc(4, nbreak);
+    B = gsl_vector_alloc(ncoeffs);
+       
+    X = gsl_matrix_alloc(interpo_points, ncoeffs);
+    c = gsl_vector_alloc(ncoeffs);
+       
+    cov = gsl_matrix_alloc(ncoeffs, ncoeffs);
+    mw = gsl_multifit_linear_alloc(interpo_points, ncoeffs);
+     
+     
+    // use uniform breakpoints on 
+    gsl_bspline_knots_uniform(ktsqrvals[interpolation_start],
+            ktsqrvals[interpolation_end], bw);
+     
+    /* construct the fit matrix X */
+    for (int i = 0; i < interpo_points; ++i)
+    {
+       double xi = gsl_vector_get(x, i);
+     
+       /* compute B_j(xi) for all j */
+       gsl_bspline_eval(xi, B, bw);
+     
+       /* fill in row i of X */
+       for (int j = 0; j < ncoeffs; ++j)
+       {
+          double Bj = gsl_vector_get(B, j);
+          gsl_matrix_set(X, i, j, Bj);
+       }
+    }
+     
+    /* do the fit */
+    REAL chisq;
+    gsl_multifit_wlinear(X, w, y, c, cov, &chisq, mw);
+
+    gsl_vector_free(x);
+    gsl_vector_free(y);
+    gsl_vector_free(w);
+
+    interpolation_rapidity=rapidity;
+}
+
+
+
+REAL Amplitude::BSplineAmplitude(REAL ktsqr, REAL rapidity)
+{
+    /*REAL n,yerr;
+    gsl_bspline_eval(ktsqr, B, bw);
+    gsl_multifit_linear_est(B, c, cov, &n, &yerr);
+    return n;
+    */
+
+    
+    // Find ktsqrval and yval indexes refer to index for which
+    // val[index]  is smaller than (or equal) y/ktsqr
+    int yind = -1;
+    for (unsigned int i=0; i<yvals.size()-1; i++)
+    {
+        if (yvals[i]<=rapidity and yvals[i+1]>rapidity)
+        {
+            yind=i;
+            break;
+        }
+    }
+    if (yind < 0) // Didn't find, so refers to the largest one 
+    {
+        yind=yvals.size()-1;
+        if (rapidity-yvals[yind]>0.05)
+            cerr << "Asked derivative at too large Y=" << rapidity << ", falling back to "
+                << " y=" << yvals[yind] << ". " << LINEINFO << endl;
+    }
+    int ktsqrind=-1;
+    for (unsigned int i=0; i<ktsqrvals.size()-1; i++)
+    {
+        if (ktsqrvals[i]<=ktsqr and ktsqrvals[i+1]>ktsqr)
+        {
+            ktsqrind=i;
+            break;
+        }
+    }
+    if (ktsqrind < 0) // Didn't find, so refers to the largest one 
+    {
+        ktsqrind=ktsqrvals.size()-1;
+        if (ktsqr - ktsqrvals[ktsqrvals.size()-1] > 100)
+            cerr << "Asked derivative at too large ktsqr=" << ktsqr << ", falling back to "
+                << " ktsqr=" << ktsqrvals[ktsqrind] << ". " << LINEINFO << endl;
+    }
+
+    /*if (ktsqrind < interpolation_start+10 or ktsqrind > interpolation_end - 10
+        or std::abs(rapidity < interpolation_rapidity) > 0.01)
+    {
+        IntializeBSpline(ktsqrind, rapidity);
+    }*/
+    IntializeBSpline(ktsqrind, rapidity);
+   
     
 
-    gsl_bspline_workspace *bw;
-       gsl_vector *B;
-       double dy;
-       gsl_vector *c;
-       gsl_matrix *X, *cov;
-       gsl_multifit_linear_workspace *mw;
-
-     
-       /* allocate a cubic bspline workspace (k = 4) */
-       bw = gsl_bspline_alloc(4, nbreak);
-       B = gsl_vector_alloc(ncoeffs);
-       
-       X = gsl_matrix_alloc(points, ncoeffs);
-       c = gsl_vector_alloc(ncoeffs);
-       
-       cov = gsl_matrix_alloc(ncoeffs, ncoeffs);
-       mw = gsl_multifit_linear_alloc(points, ncoeffs);
-     
-     
-       /* use uniform breakpoints on [0, 15] */
-       gsl_bspline_knots_uniform(ktsqrarray[0], ktsqrarray[points-1], bw);
-     
-       /* construct the fit matrix X */
-       for (int i = 0; i < points; ++i)
-         {
-           double xi = gsl_vector_get(x, i);
-     
-           /* compute B_j(xi) for all j */
-           gsl_bspline_eval(xi, B, bw);
-     
-           /* fill in row i of X */
-           for (int j = 0; j < ncoeffs; ++j)
-             {
-               double Bj = gsl_vector_get(B, j);
-               gsl_matrix_set(X, i, j, Bj);
-             }
-         }
-     
-       /* do the fit */
-       REAL chisq;
-       gsl_multifit_wlinear(X, w, y, c, cov, &chisq, mw);
-
-    REAL n1,n2,yerr;
+    REAL n1,yerr;
     gsl_bspline_eval(ktsqr, B, bw);
     gsl_multifit_linear_est(B, c, cov, &n1, &yerr);
-    gsl_bspline_eval(ktsqr+ktsqr/100.0, B, bw);
-    gsl_multifit_linear_est(B, c, cov, &n2, &yerr);
 
-       gsl_bspline_free(bw);
-       gsl_vector_free(B);
-       gsl_vector_free(x);
-       gsl_vector_free(y);
-       gsl_matrix_free(X);
-       gsl_vector_free(c);
-       gsl_vector_free(w);
-       gsl_matrix_free(cov);
-       gsl_multifit_linear_free(mw);
-
-       return ktsqr/n1*(n2-n1)/(ktsqr/100.0);
-
-
+    return n1;
 
 }
+
+/*
+REAL Amplitude::BSplineDerivative(REAL ktsqr, REAL* ktsqrarray, REAL* narray, uint points)
+{
+    REAL n1,n2;
+    n1 = BSplineAmplitude(ktsqr, ktsqrarray, narray, points);
+    n2 = BSplineAmplitude(ktsqr+ktsqr/100.0, ktsqrarray, narray, points);
+    
+
+   return ktsqr/n1*(n2-n1)/(ktsqr/100.0);
+
+}*/
 
 
 REAL Amplitude::InitialCondition(REAL ktsqr)
@@ -516,7 +561,7 @@ int Amplitude::ReadData(string file)
 	DataFile f(file);
 	SetMinKtsqr(f.MinKtsqr());
 	SetKtsqrMultiplier(f.KtsqrMultiplier());
-	SetMaxKtsqr(minktsqr*pow(KtsqrMultiplier(), f.KtsqrPoints()));	
+	SetMaxKtsqr(minktsqr*std::pow(KtsqrMultiplier(), f.KtsqrPoints()));
 	SetMaxY(f.MaxY());
 	SetDeltaY(f.DeltaY());
 	Initialize();
@@ -615,4 +660,31 @@ REAL Amplitude::MaxKtsqr()
 bool Amplitude::KinematicalConstraint()
 {
     return kinematic_constraint;
+}
+
+Amplitude::~Amplitude()
+{
+
+    // If bspline interpolation was used
+    if (interpolation_rapidity>=0)
+    {
+        gsl_bspline_free(bw);
+        gsl_vector_free(B);
+        gsl_matrix_free(X);
+        gsl_vector_free(c);
+        
+        gsl_matrix_free(cov);
+        gsl_multifit_linear_free(mw);
+    }
+    
+}
+
+void Amplitude::SetRunningCoupling(bool rc)
+{
+    running_coupling=rc;
+}
+
+bool Amplitude::RunningCoupling()
+{
+    return running_coupling;
 }

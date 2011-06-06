@@ -11,10 +11,12 @@
 #include "chebyshev_amplitude.hpp"
 #include "tools.hpp"
 #include "chebyshev.hpp"
+#include "hankel.hpp"
 #include <gsl/gsl_errno.h>
 #include <cmath>
 #include <fstream>
 #include <string>
+#include <iomanip>
 #include <sstream>
 #include <omp.h>
 
@@ -34,6 +36,7 @@ enum MODE
     GENERATE_DATAFILE,      // Solve and print output to one huge file
     GENERATE_PLOTS,         // Print output to different files with constant rapidity
     GENERATE_SINGLE_PLOT,   // Print amplitude at a given rapidity
+    GENERATE_SINGLE_RPLOT,  // Print amplitude in r-space at a given rapidity
     LOGLOG_DERIVATIVE   // Calculate d ln N(k^2) / d ln(k^2)
 };
 
@@ -54,7 +57,7 @@ Amplitude* N;
 REAL minktsqr=DEFAULT_MINKTSQR;
 REAL maxktsqr = DEFAULT_MAXKTSQR;
 REAL ktsqr_mult = DEFAULT_KTSQR_MULTIPLIER;
-uint ktsqrpoints;
+uint ktsqrpoints = static_cast<uint>(std::log(maxktsqr/minktsqr) / std::log(ktsqr_mult));
 REAL y = 0;
 REAL miny = 0.0;
 REAL maxy = 0.0;
@@ -64,6 +67,7 @@ REAL y_points = 10;
 INITIAL_CONDITION ic=FTIPSAT;
 MODE mode=GENERATE_DATAFILE;
 bool kc=false;  // Kinematical constraint
+bool running_coupling=false;
 
 METHOD method=CHEBYSHEV_SERIES;
 
@@ -88,7 +92,7 @@ void SinglePlotR();     // FT to r-space
 void Clear();
 
 int main(int argc, char* argv[])
-{
+{    
     // Print the cmdline args
     std::stringstream cmdline;
     cmdline << "# ";
@@ -104,7 +108,7 @@ int main(int argc, char* argv[])
     if (argc>1)  if (string(argv[1])=="-help")
     {
         cout << "Usage: " << endl;
-        cout << "-mode [MODE]: what to do, modes: GENERATE_DATA, GENERATE_PLOTS, SINGLE_PLOT, LOGLOG_DERIVATIVE" << endl;
+        cout << "-mode [MODE]: what to do, modes: GENERATE_DATA, GENERATE_PLOTS, SINGLE_PLOT, SINGLE_RPLOT, LOGLOG_DERIVATIVE" << endl;
         cout << "-method [METHOD]: what method is used to solve BK, methods: BRUTEFORCE, CHEBYSHEV" << endl;
         cout << "-output [prefix]: set output file prefix, filenames are prefix_y[rapidity].dat" << endl;
         cout << "-miny, -maxy: rapidity values to solve" << endl;
@@ -118,6 +122,7 @@ int main(int argc, char* argv[])
         cout << "-load_matrix [filename], -save_matrix [filename]: load/save coefficient matrix (CHEBYSHEV method)" << endl;
         cout << "-chebyshev_degree [number]: number of basis vectors" << endl;
         cout << "-minktsqr [val], -maxktsqr [val], -ktsqrpoints [val]" << endl;
+        cout << "-rc (apply running coupling)" << endl;
         return 0;
     }
 
@@ -137,6 +142,8 @@ int main(int argc, char* argv[])
             file_prefix=argv[i+1];
         else if (string(argv[i])=="-kc")
             kc=true;
+        else if (string(argv[i])=="-rc")
+            running_coupling=true;
         else if (string(argv[i])=="-avg")
             avg=StrToInt(argv[i+1]);
         else if (string(argv[i])=="-data")
@@ -196,6 +203,8 @@ int main(int argc, char* argv[])
 				mode=GENERATE_PLOTS;
             else if (string(argv[i+1])=="SINGLE_PLOT")
                 mode=GENERATE_SINGLE_PLOT;
+            else if (string(argv[i+1])=="SINGLE_RPLOT")
+                mode=GENERATE_SINGLE_RPLOT;
             else
             {
                 cerr << "Unrecognized mode " << argv[i+1] << ", exiting..." << endl;
@@ -230,6 +239,7 @@ int main(int argc, char* argv[])
     else if (method==CHEBYSHEV_SERIES) N = new ChebyshevAmplitudeSolver;
 
     N->SetInitialCondition(ic);
+    N->SetRunningCoupling(running_coupling);
     N->SetKinematicConstraint(kc);
     N->SetMaxY(maxy);
     N->SetMaxKtsqr(maxktsqr);
@@ -252,6 +262,8 @@ int main(int argc, char* argv[])
 
     infostr << "# Kinematical constraint is ";
     if (kc) infostr << "applied"; else infostr << "not applied"; infostr << endl;
+    infostr << "# Running coupling is ";
+    if (N->RunningCoupling()) infostr << "applied"; else infostr << "not applied"; infostr << endl;
 
     infostr << "# Initial condition: " << N->InitialConditionStr() <<  endl;
     infostr << "# Grid size: ktsqrpoints x ypoints = " << N->KtsqrPoints() << " x " << N->YPoints()
@@ -269,8 +281,14 @@ int main(int argc, char* argv[])
             if (mode != GENERATE_DATAFILE)
             {
                 cout << "# Reading data from file " << datafile << endl;
-                ((BruteForceSolver*)N)->ReadData(datafile);    
-                infostr << "# Data read from file " << datafile << endl;
+                ((BruteForceSolver*)N)->ReadData(datafile);
+                minktsqr = N->MinKtsqr();
+                maxktsqr = N->MaxKtsqr();
+                ktsqrpoints = N->KtsqrPoints();
+                cout << "# Data read from file " << datafile <<
+                    " ktsqrlimits " << minktsqr << " - " << maxktsqr
+                    << ", points " << ktsqrpoints << ", multiplier "
+                    << N->KtsqrMultiplier() << endl;
             }
             else
             {
@@ -286,7 +304,10 @@ int main(int argc, char* argv[])
             {
                 cout << "# Loading coefficient matrix from file " << matrixfile << endl;
                 ((ChebyshevAmplitudeSolver*)N)->LoadMatrix(matrixfile);
+                cout << "# Matrix loaded, M=" << ((ChebyshevAmplitudeSolver*)N)->M() << endl;
                 cout << "# Intializing ChebyshevAmplitudeSolver environment..." << endl;
+                maxktsqr = N->MaxKtsqr();
+                minktsqr = N->MinKtsqr();
                 ((ChebyshevAmplitudeSolver*)N)->Prepare();
 
                 // Check if we are asked to use fewer number of cheb polynomials
@@ -341,6 +362,8 @@ int main(int argc, char* argv[])
         LogLogDerivative();
     else if (mode==GENERATE_SINGLE_PLOT)
         SinglePlot();
+    else if (mode==GENERATE_SINGLE_RPLOT)
+        SinglePlotR();
 
 
     Clear();
@@ -390,11 +413,12 @@ void GenerateDataFile()
     std::stringstream s; s << file_prefix; s << ".dat";
     output.open(s.str().c_str());
     output << infostr.str();
-    cout << "Saving data to file " << s.str() << endl;
+    cout << "# Saving data to file " << s.str() << endl;
+    output << "# Running coupling: " << N->RunningCoupling() << endl;
 
     // Metadata (see README for the syntax)
-    output << "###" << N->MinKtsqr() << endl;
-    output << "###" << N->KtsqrMultiplier() << endl;
+    output << "###" << std::scientific << std::setprecision(15) << N->MinKtsqr() << endl;
+    output << "###" << std::scientific << std::setprecision(15) << N->KtsqrMultiplier() << endl;
     output << "###" << ktsqrpoints << endl;
 
     unsigned int yp = static_cast<int>(maxy/N->DeltaY())+1;
@@ -412,8 +436,8 @@ void GenerateDataFile()
 			
         for (int i=0; i<ktsqrpoints; i++)
 		{
-			REAL tmpktsqr = minktsqr*std::pow(ktsqr_mult, i);
-			output << N->N(tmpktsqr, tmpy) << endl;
+			REAL tmpktsqr = minktsqr*std::pow(N->KtsqrMultiplier(), i);
+			output << std::scientific << std::setprecision(15) << N->N(tmpktsqr, tmpy) << endl;
         }
     }
     output.close();
@@ -444,11 +468,15 @@ void SinglePlot()
 {
     cout << "# y=" << y << ", ic=" << N->InitialConditionStr() << endl;
     cout << "# ktsqr amplitude initial_condition" << endl;
-    for (int i=0; i<N->KtsqrPoints()-1; i+=2)
+    ktsqr_mult = N->KtsqrMultiplier();
+
+    for (int i=0; i<N->KtsqrPoints()-1; i+=10)
     {
-        REAL tmpktsqr = minktsqr*std::pow(ktsqr_mult, i);
-        cout << tmpktsqr << " " << N->N(tmpktsqr, y) << " " <<
-            N->InitialCondition(tmpktsqr) << endl;
+        REAL tmpktsqr = N->MinKtsqr()*std::pow(ktsqr_mult, i);
+        cout << std::scientific << std::setprecision(15) << tmpktsqr << " " <<
+            std::scientific << std::setprecision(15) << N->N(tmpktsqr, y) << " " <<
+            std::scientific << std::setprecision(15) << N->InitialCondition(tmpktsqr)
+            << " " << std::scientific << std::setprecision(15) << N->BSplineAmplitude(tmpktsqr, y) << endl;
     }
 }
 
@@ -458,11 +486,13 @@ void SinglePlot()
 
 REAL Inthelperf_ft(REAL ktqr, void* p)
 {
-    
+    return 0;
 }
 void SinglePlotR()
 {
-
+    cout << "# y=" << y << ", ic=" << N->InitialConditionStr() << endl;
+    Hankel transformed(N, y, 100);
+    transformed.PrintRAmplitude();
 
 }
 

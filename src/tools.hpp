@@ -17,7 +17,7 @@ void ErrHandler(const char * reason,
                         int line,
                         int gsl_errno);
 
-
+REAL Alpha_s(REAL Qsqr);
 
 #endif
 
