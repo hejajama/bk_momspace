@@ -5,6 +5,7 @@
 # x y
 
 import sys
+import pdb
 sys.path.append('/home/hejajama/lib/python');
 
 from matplotlib.pyplot import *
@@ -19,7 +20,9 @@ dashes = ['--', #    : dashed line
           '-.', #   : dash-dot line
           ':', #    : dotted line
            '-']
-colors = [ "black", "blue", "red", '0.35']
+colors = [ "black", "blue", "red", '0.35', '0.75']
+
+textsize = 16
 
 # Possibility to use , as a desimal separator
 import locale
@@ -44,6 +47,21 @@ def readfile(file, xlist, ylist,m=1.0,err=[]):
 			ylist.append(float(s[1])*m)
 			err.append(float(s[2])*m)
 	f.close()
+
+# Read data from two first columns, ignore others
+def readfile_xy(file, xlist, ylist):
+    f = open(file,"r")
+    lines=f.readlines()
+    n=len(lines)
+
+    for i in range(n):
+        #print i #str(len(lines[i])) + str(i)
+        s=lines[i].split()
+        if (len(lines[i])>1 and s[0][0]!="#"):
+            #pdb.set_trace()
+            xlist.append(float(s[0]))
+            ylist.append(float(s[1]))
+    f.close()
 
 # Read data and multiply all y values by factor m
 # syntax in file: x y ystaterr posyerr negyerr
