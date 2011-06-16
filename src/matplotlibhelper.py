@@ -36,7 +36,7 @@ def readfile(file, xlist, ylist,m=1.0,err=[]):
 
 	for i in range(n):
 		s=lines[i].split()
-		if (len(s)==2 and s[0]!="#"):
+		if (len(s)==2 and s[0][0]!="#"):
 			xlist.append(float(s[0]))
 			ylist.append(float(s[1])*m)
 		if (len(s)==3 and s[0]!="#"):
