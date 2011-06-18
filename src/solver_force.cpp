@@ -48,7 +48,7 @@ REAL inthelperf_bkmom_noconstraint(REAL ktsqr, void* p)
      *  sgn(k'^2 - k^2)/k^2 [N(k^2) + k'^2 N'(k^2) ] + N(k^2)/( Sqrt[5] k^2 )
      */
 
-    if (std::abs(ktsqr - par->ktsqr) < 1e-14)
+    if (std::abs(ktsqr - par->ktsqr) < 1e-15)
     {
         //cerr << "ktsqr \\approx par->ktsqr and we can't handle this! y=" << par->y
         //   << " par->ktsqr=" << par->ktsqr << " ktsqr: " << ktsqr << " " << LINEINFO << endl;
@@ -89,7 +89,7 @@ REAL inthelperf_bkmom_constraint(REAL ktsqr, void* p)
     inthelper_bkmom* par = (inthelper_bkmom*) p;
 
     REAL result=0;
-    if (abs(ktsqr - par->ktsqr) < 1e-18)
+    if (abs(ktsqr - par->ktsqr) < 1e-16)
     {
         cerr << "ktsqr \\approx par->ktsqr and we can't handle this! y=" << par->y
             << " par->ktsqr=" << par->ktsqr << " at " << LINEINFO << endl;

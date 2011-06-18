@@ -16,6 +16,8 @@
 #include <gsl/gsl_odeiv.h>
 #include <gsl/gsl_deriv.h>
 #include <gsl/gsl_multifit.h>
+#include <gsl/gsl_min.h>
+
 
 #include <cmath>
 
@@ -485,6 +487,73 @@ REAL Amplitude::BSplineAmplitude(REAL ktsqr, REAL rapidity)
 
     return n1;
 
+}
+
+/*
+ * Saturation Scale
+ * Calculates Q_s
+ * Note: There area different definitions for Q_s, here the definition similar than
+ * in hep-ph/0504080 is used:
+ * k^(2*\gamma_c)N(k) has a maximum at k=Q_s, \gamma_c is the anomalous
+ * dimension \gamma_c=0.6275
+ * Note: in hep-ph/0504080 a reduced wave front with \gamma_c=0.5 is studied
+ * due to the small lattice size, which is not a problem here if Y is small enough
+ * (Y=40 is not too large)
+ */
+
+struct Sathelper
+{
+    Amplitude* N;
+    REAL y;
+    REAL gammac;
+};
+
+REAL SaturationHelperf(REAL ktsqr, void* p)
+{
+    Sathelper* par = (Sathelper*)p;
+    return -std::pow(ktsqr, par->gammac)*par->N->N(ktsqr, par->y);
+    //return -std::pow(ktsqr, par->gammac)*par->N->BSplineAmplitude(ktsqr, par->y);
+    
+}
+REAL Amplitude::SaturationScale(REAL y)
+{
+    Sathelper helper;
+    helper.y=y; helper.N=this;
+    helper.gammac = 0.6275;
+    
+    gsl_function f; f.function=&SaturationHelperf;
+    f.params=&helper;
+
+    const gsl_min_fminimizer_type *T = gsl_min_fminimizer_brent;
+    gsl_min_fminimizer *s = gsl_min_fminimizer_alloc(T);
+
+    // Interpolation doesn't work well at the edge of the ktsqr range, so limit
+    // the studied interval
+    REAL interval_min = Ktsqrval(1);
+    REAL interval_max = Ktsqrval(KtsqrPoints()-2);
+    REAL pos = std::exp( 0.4*y );   // ref: Q_s^2 \sim exp(v_c*Y)
+    if (pos < interval_min) pos = 2.0*interval_min;
+    if (pos>interval_max) pos = 0.5*interval_max;
+    
+    gsl_min_fminimizer_set(s, &f, pos, interval_min, interval_max);
+    int status; int max_iter = 500; int iter;
+    do
+    {
+        iter++;
+        gsl_min_fminimizer_iterate(s);
+        pos = gsl_min_fminimizer_x_minimum(s);
+        interval_min = gsl_min_fminimizer_x_lower (s);
+        interval_max = gsl_min_fminimizer_x_upper (s);
+        status = gsl_min_test_interval (interval_min, interval_max, 0.0, 0.001);
+        
+    } while (status == GSL_CONTINUE and iter < max_iter);
+
+    gsl_min_fminimizer_free(s);
+
+    //cout << "start: " << std::exp(0.4*y) << " min: " << Ktsqrval(1) << " max: " << Ktsqrval(KtsqrPoints()-2)
+    //    << " minimumsqr: " << pos << " iterations: " << iter << endl;
+
+    return std::sqrt(pos);
 }
 
 /*

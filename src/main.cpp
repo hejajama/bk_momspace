@@ -68,6 +68,7 @@ INITIAL_CONDITION ic=FTIPSAT;
 MODE mode=GENERATE_DATAFILE;
 bool kc=false;  // Kinematical constraint
 bool running_coupling=false;
+bool scale_sat=false;  // Scale k_T with the scaturation scale
 
 METHOD method=CHEBYSHEV_SERIES;
 
@@ -122,7 +123,8 @@ int main(int argc, char* argv[])
         cout << "-load_matrix [filename], -save_matrix [filename]: load/save coefficient matrix (CHEBYSHEV method)" << endl;
         cout << "-chebyshev_degree [number]: number of basis vectors" << endl;
         cout << "-minktsqr [val], -maxktsqr [val], -ktsqrpoints [val]" << endl;
-        cout << "-rc (apply running coupling)" << endl;
+        cout << "-rc: apply running coupling" << endl;
+        cout << "-scale_sat: scale k_T by saturation scale" << endl;
         return 0;
     }
 
@@ -144,6 +146,8 @@ int main(int argc, char* argv[])
             kc=true;
         else if (string(argv[i])=="-rc")
             running_coupling=true;
+        else if (string(argv[i])=="-scale_sat")
+            scale_sat=true;
         else if (string(argv[i])=="-avg")
             avg=StrToInt(argv[i+1]);
         else if (string(argv[i])=="-data")
@@ -289,6 +293,7 @@ int main(int argc, char* argv[])
                     " ktsqrlimits " << minktsqr << " - " << maxktsqr
                     << ", points " << ktsqrpoints << ", multiplier "
                     << N->KtsqrMultiplier() << endl;
+
             }
             else
             {
@@ -452,6 +457,8 @@ void LogLogDerivative()
 {
     int ktsqrpoints = N->KtsqrPoints();
     cout << "# d ln N(k^2) / d ln (k^2), y=" << y << endl;
+    cout << "# Saturation scale: k_T:" << endl;
+    cout << "### " << N->SaturationScale(y) << endl;
 	cout << "#ktsqr derivative " << endl;
 		
 	for (int i=0; i<ktsqrpoints-1; i++)
@@ -467,6 +474,8 @@ void LogLogDerivative()
 void SinglePlot()
 {
     cout << "# y=" << y << ", ic=" << N->InitialConditionStr() << endl;
+    cout << "# Saturation scale: k_T:" << endl;
+    cout << "### " << N->SaturationScale(y) << endl;
     cout << "# ktsqr amplitude initial_condition" << endl;
     ktsqr_mult = N->KtsqrMultiplier();
 

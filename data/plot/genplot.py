@@ -26,7 +26,7 @@ maxy=100
 
 
 def sqrt_data(x):
-    for i in range(len(x)-1):
+    for i in range(len(x)):
         x[i]=math.sqrt(x[i])
 
 fig = figure()

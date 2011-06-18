@@ -63,6 +63,23 @@ def readfile_xy(file, xlist, ylist):
             ylist.append(float(s[1]))
     f.close()
 
+# Read parameters from the file
+# Parameters are strings/numbers appearing on a line formatted as
+# "### parameter"
+def read_parameters(file):
+    f = open(file, "r")
+    lines = f.readlines()
+    n = len(lines)
+    params=[]
+    for i in range(n):
+        if (len(lines[i])<3):
+            continue
+        s = lines[i].split()
+        if (s[0]=="###"):
+            params.append(s[1])
+    f.close()
+    return params
+
 # Read data and multiply all y values by factor m
 # syntax in file: x y ystaterr posyerr negyerr
 def readfile_errorarray(file, xlist, ylist,m=1.0,errorarray=[]): 
@@ -90,3 +107,8 @@ def readfile_errorarray(file, xlist, ylist,m=1.0,errorarray=[]):
 	errorarray.append([])
 	for j in tmpposerr:
 		errorarray[1].append(j)
+
+# Scale list by a constant
+def scale_list(list, const):
+    for i in range(len(list)):
+        list[i] = list[i]*const

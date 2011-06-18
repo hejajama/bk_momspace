@@ -23,8 +23,8 @@ const REAL DEFAULT_MAXKTSQR = 1e10; // orig: 1e10
 //const unsigned int POINTS_Y= (int)(MAXY/DELTA_Y);
 //const unsigned int POINTS_KTSQR = (int)(std::log(MAXKTSQR/MINKTSQR) / std::log(KTSQR_MULTIPLIER) );
 
-const REAL KTSQRINTACCURACY = 0.005;
-const int KTSQRINTITERATIONS = 9000;
+const REAL KTSQRINTACCURACY = 0.001;
+const int KTSQRINTITERATIONS = 12000;
 const int INTERPOLATION_POINTS = 10;
 const int INTERPOLATION_POINTS_DER=200;
 
@@ -52,6 +52,9 @@ class Amplitude
         virtual REAL N(REAL ktsqr, REAL y, bool bspline=false);
         void IntializeBSpline(int ktsqrind, REAL rapidity);
         REAL BSplineAmplitude(REAL ktsqr, REAL rapidity);
+
+        REAL SaturationScale(REAL y);
+        
         //REAL BSplineAmplitude(REAL ktsqr, REAL *ktsqrarray, REAL *narray, uint points);
         void AddDataPoint(int ktsqrindex, int yindex, REAL value, REAL der);
         
