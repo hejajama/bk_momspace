@@ -288,12 +288,12 @@ int main(int argc, char* argv[])
                 ((BruteForceSolver*)N)->ReadData(datafile);
                 minktsqr = N->MinKtsqr();
                 maxktsqr = N->MaxKtsqr();
+				ktsqr_mult = N->KtsqrMultiplier();
                 ktsqrpoints = N->KtsqrPoints();
                 cout << "# Data read from file " << datafile <<
                     " ktsqrlimits " << minktsqr << " - " << maxktsqr
                     << ", points " << ktsqrpoints << ", multiplier "
                     << N->KtsqrMultiplier() << endl;
-
             }
             else
             {
@@ -460,7 +460,7 @@ void LogLogDerivative()
     cout << "# Saturation scale: k_T:" << endl;
     cout << "### " << N->SaturationScale(y) << endl;
 	cout << "#ktsqr derivative " << endl;
-		
+
 	for (int i=0; i<ktsqrpoints-1; i++)
 	{
 		REAL tmpktsqr = minktsqr*std::pow(ktsqr_mult, i);
