@@ -5,7 +5,7 @@ import sys
 import math
 import pdb
 sys.path.append("/home/hejajama/lib/")
-sys.path.append("../../src/")
+sys.path.append("../src/")
 
 from matplotlibhelper import *
 
@@ -13,11 +13,15 @@ from matplotlibhelper import *
 yvals = [2,6,10,30]
 
 # [text id style, width]
-modes = [ ["", "plain", dashes[1], 1], ["RC", "rc", dashes[0], 2] ]
-ic = "invpower_y0"
+modes = [
+    ["", "plain", dashes[1], 1],
+    ["RC", "rc", dashes[0], 2] ]
+
+ic = "invpower"
+icfile = ic + "/loglogder/ic"
 
 minx=1e-4
-maxx=1e9
+maxx=1e10
 miny=-1.1
 maxy=0.1
 
@@ -39,14 +43,14 @@ ylabel(r"d ln $N(k^2)/$ d ln $k^2$")
 # Plot initial condition
 xdata=[]
 ydata=[]
-readfile(ic, xdata, ydata)
+readfile(icfile, xdata, ydata)
 sqrt_data(xdata)
 p1.semilogx(xdata, ydata, label="IC", linestyle=dashes[1], linewidth=3)
 
 
 for y in yvals:
     for mode in modes:
-        data = mode[1] + "/loglogder_y" + str(y)
+        data = ic + "/loglogder/" + mode[1] + "/loglogder_y" + str(y)
         xdata=[]
         ydata=[]
         readfile(data, xdata, ydata)
@@ -67,6 +71,7 @@ for y in yvals:
             lbl = lbl + ", " + mode[0]
         p1.semilogx(xdata, ydata, label=lbl, linestyle = mode[2], linewidth = mode[3])
 
+fig.suptitle(r"Initial condition " + ic)
 axis([minx,maxx,miny,maxy])
 leg=legend(prop=dict(size=textsize),labelspacing=0.001)
 leg.draw_frame(False)

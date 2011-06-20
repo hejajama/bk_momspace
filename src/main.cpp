@@ -7,6 +7,7 @@
 #include "config.hpp"
 #include "amplitude.hpp"
 #include "solver_force.hpp"
+#include "solver_force2.hpp"
 #include "solver_chebyshev.hpp"
 #include "chebyshev_amplitude.hpp"
 #include "tools.hpp"
@@ -37,12 +38,14 @@ enum MODE
     GENERATE_PLOTS,         // Print output to different files with constant rapidity
     GENERATE_SINGLE_PLOT,   // Print amplitude at a given rapidity
     GENERATE_SINGLE_RPLOT,  // Print amplitude in r-space at a given rapidity
-    LOGLOG_DERIVATIVE   // Calculate d ln N(k^2) / d ln(k^2)
+    LOGLOG_DERIVATIVE,   // Calculate d ln N(k^2) / d ln(k^2)
+    SATURATION_SCALE        // Calculate Q_s as a function of y up to maxy
 };
 
 enum METHOD
 {
     BRUTEFORCE,             // BruteForceSolver
+    BRUTEFORCE2,            // BruteForceSolver2
     CHEBYSHEV_SERIES        // ChebyshevAmplitudeSolver
 };
 
@@ -91,6 +94,7 @@ void LogLogDerivative();
 void SinglePlot();
 void SinglePlotR();     // FT to r-space
 void Clear();
+void SaturationScale();
 
 int main(int argc, char* argv[])
 {    
@@ -109,8 +113,9 @@ int main(int argc, char* argv[])
     if (argc>1)  if (string(argv[1])=="-help")
     {
         cout << "Usage: " << endl;
-        cout << "-mode [MODE]: what to do, modes: GENERATE_DATA, GENERATE_PLOTS, SINGLE_PLOT, SINGLE_RPLOT, LOGLOG_DERIVATIVE" << endl;
-        cout << "-method [METHOD]: what method is used to solve BK, methods: BRUTEFORCE, CHEBYSHEV" << endl;
+        cout << "-mode [MODE]: what to do, modes: GENERATE_DATA, GENERATE_PLOTS, SINGLE_PLOT, SINGLE_RPLOT, LOGLOG_DERIVATIVE " << endl;
+        cout << "              SATURATION_SCALE" << endl;
+        cout << "-method [METHOD]: what method is used to solve BK, methods: BRUTEFORCE[2], CHEBYSHEV" << endl;
         cout << "-output [prefix]: set output file prefix, filenames are prefix_y[rapidity].dat" << endl;
         cout << "-miny, -maxy: rapidity values to solve" << endl;
         //cout << "-minktsqr, -maxktsqr: range of k_T^2 to plot, doesn't affect to limits when solving BK" << endl;
@@ -209,6 +214,8 @@ int main(int argc, char* argv[])
                 mode=GENERATE_SINGLE_PLOT;
             else if (string(argv[i+1])=="SINGLE_RPLOT")
                 mode=GENERATE_SINGLE_RPLOT;
+            else if (string(argv[i+1])=="SATURATION_SCALE")
+                mode = SATURATION_SCALE;
             else
             {
                 cerr << "Unrecognized mode " << argv[i+1] << ", exiting..." << endl;
@@ -220,6 +227,8 @@ int main(int argc, char* argv[])
         {
             if (string(argv[i+1])=="BRUTEFORCE")
                 method = BRUTEFORCE;
+            else if (string(argv[i+1])=="BRUTEFORCE2")
+                method = BRUTEFORCE2;
             else if (string(argv[i+1])=="CHEBYSHEV")
                 method = CHEBYSHEV_SERIES;
             else
@@ -240,6 +249,7 @@ int main(int argc, char* argv[])
      ***************************************/
 
     if (method==BRUTEFORCE) N = new BruteForceSolver;
+    else if (method == BRUTEFORCE2) N = new BruteForceSolver2;
     else if (method==CHEBYSHEV_SERIES) N = new ChebyshevAmplitudeSolver;
 
     N->SetInitialCondition(ic);
@@ -280,6 +290,28 @@ int main(int argc, char* argv[])
 
     switch(method)
     {
+        case BRUTEFORCE2:
+            N->SetNumberOfAveragements(avg);
+            if (mode != GENERATE_DATAFILE)
+            {
+                cout << "# Reading data from file " << datafile << endl;
+                ((BruteForceSolver2*)N)->ReadData(datafile);
+                minktsqr = N->MinKtsqr();
+                maxktsqr = N->MaxKtsqr();
+				ktsqr_mult = N->KtsqrMultiplier();
+                ktsqrpoints = N->KtsqrPoints();
+                cout << "# Data read from file " << datafile <<
+                    " ktsqrlimits " << minktsqr << " - " << maxktsqr
+                    << ", points " << ktsqrpoints << ", multiplier "
+                    << N->KtsqrMultiplier() << endl;
+            }
+            else
+            {
+                cout << "# Generating data..." << endl;
+                ((BruteForceSolver2*)N)->Solve(maxy);
+            }
+            
+            break;
         case BRUTEFORCE:
             N->SetNumberOfAveragements(avg);
             if (mode != GENERATE_DATAFILE)
@@ -369,6 +401,8 @@ int main(int argc, char* argv[])
         SinglePlot();
     else if (mode==GENERATE_SINGLE_RPLOT)
         SinglePlotR();
+    else if (mode==SATURATION_SCALE)
+        SaturationScale();
 
 
     Clear();
@@ -476,7 +510,7 @@ void SinglePlot()
     cout << "# y=" << y << ", ic=" << N->InitialConditionStr() << endl;
     cout << "# Saturation scale: k_T:" << endl;
     cout << "### " << N->SaturationScale(y) << endl;
-    cout << "# ktsqr amplitude initial_condition" << endl;
+    cout << "# ktsqr amplitude initial_condition bspline_amplitude" << endl;
     ktsqr_mult = N->KtsqrMultiplier();
 
     for (int i=0; i<N->KtsqrPoints()-1; i+=10)
@@ -505,4 +539,16 @@ void SinglePlotR()
 
 }
 
+/*
+ * Plot Q_s as a function of y up to maxy
+ */
+void SaturationScale()
+{
+    cout << "# Saturation scale Q_s as a function of y" << endl;
+    cout << "# y  Q_s " << endl;
+    for (REAL tmpy=0; tmpy<maxy; tmpy += 0.1)
+    {
+        cout << std::scientific << std::setprecision(15) << tmpy << " " << N->SaturationScale(tmpy) << endl;
+    }
+}
 

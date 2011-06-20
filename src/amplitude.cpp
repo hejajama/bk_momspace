@@ -130,6 +130,13 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline)
                 << " ktsqr=" << ktsqrvals[ktsqrind] << ". " << LINEINFO << endl;
     }
 
+    if (std::abs(ktsqr - ktsqrvals[0])/ktsqrvals[0] < 0.001)    // Don't interpolate in kt
+    {
+        if (yind == yvals.size()-1) return n[0][yind];
+        return n[0][yind]+(y-yvals[yind])*(n[0][yind+1]-n[0][yind])
+            / ( yvals[yind+1] - yvals[yind] );
+    }
+
     // Keep y fixed, interpolate ktsqr
     // Interpolate only INTERPOLATION_POINTS points in order to make this
     // almost fast
@@ -271,6 +278,8 @@ REAL Amplitude::LogLogDerivative(REAL ktsqr, REAL rapidity)
     REAL n1,n2;
     n1 = BSplineAmplitude(ktsqr, rapidity);
     n2 = BSplineAmplitude(ktsqr+ktsqr/100.0, rapidity);
+	//n1 = N(ktsqr, rapidity);
+	//n2 = N(ktsqr+ktsqr/100.0, rapidity);
     
 
    return ktsqr/n1*(n2-n1)/(ktsqr/100.0);
@@ -511,8 +520,8 @@ struct Sathelper
 REAL SaturationHelperf(REAL ktsqr, void* p)
 {
     Sathelper* par = (Sathelper*)p;
-    return -std::pow(ktsqr, par->gammac)*par->N->N(ktsqr, par->y);
-    //return -std::pow(ktsqr, par->gammac)*par->N->BSplineAmplitude(ktsqr, par->y);
+    //return -std::pow(ktsqr, par->gammac)*par->N->N(ktsqr, par->y);
+    return -std::pow(ktsqr, par->gammac)*par->N->BSplineAmplitude(ktsqr, par->y);
     
 }
 REAL Amplitude::SaturationScale(REAL y)
@@ -536,7 +545,7 @@ REAL Amplitude::SaturationScale(REAL y)
     if (pos>interval_max) pos = 0.5*interval_max;
     
     gsl_min_fminimizer_set(s, &f, pos, interval_min, interval_max);
-    int status; int max_iter = 500; int iter;
+    int status; int max_iter = 500; int iter=0;
     do
     {
         iter++;
@@ -547,6 +556,12 @@ REAL Amplitude::SaturationScale(REAL y)
         status = gsl_min_test_interval (interval_min, interval_max, 0.0, 0.001);
         
     } while (status == GSL_CONTINUE and iter < max_iter);
+
+    if (status == GSL_CONTINUE)
+    {
+        cerr << "Didn't find saturation scale when y=" << y  << ", iterated "
+            << iter << "/" << max_iter << " times at " << LINEINFO << endl;
+    }
 
     gsl_min_fminimizer_free(s);
 

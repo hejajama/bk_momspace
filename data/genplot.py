@@ -4,7 +4,7 @@ import os
 import sys
 import math
 sys.path.append("/home/hejajama/lib/")
-sys.path.append("../../src/")
+sys.path.append("../src/")
 
 from matplotlibhelper import *
 
@@ -14,10 +14,13 @@ yvals = [2,6,10,30]
 # [text id style, width]
 modes = [
     ["", "plain", dashes[1], 1],
-    ["KC", "kc", dashes[0], 2]#, 
-    #["RC", "rc", dashes[2], 2]
+    #["KC", "kc", dashes[0], 2]#, 
+    ["RC", "rc", dashes[2], 2]
 ]
-ic = "invpower_y0"
+
+ic = "ftipsat"
+
+icfile = ic + "/plot/ic"
 
 minx=1e-4
 maxx=1e8
@@ -37,14 +40,14 @@ ylabel(r"$N(k_T)$")
 # Plot initial condition
 xdata=[]
 ydata=[]
-readfile_xy(ic, xdata, ydata)
+readfile_xy(icfile, xdata, ydata)
 sqrt_data(xdata)
 p1.semilogx(xdata, ydata, label="IC", linestyle=dashes[1], linewidth=3)
 
 
 for y in yvals:
     for mode in modes:
-        data = mode[1] + "/plot_y" + str(y)
+        data = ic + "/plot/" + mode[1] + "/plot_y" + str(y)
         xdata=[]
         ydata=[]
         print data
@@ -55,6 +58,7 @@ for y in yvals:
             lbl = lbl + ", " + mode[0]
         p1.loglog(xdata, ydata, label=lbl, linestyle = mode[2], linewidth = mode[3])
 
+fig.suptitle(r"Initial condition " + ic)
 axis([minx,maxx,miny,maxy])
 leg=legend(prop=dict(size=textsize),labelspacing=0.001, loc=3)
 leg.draw_frame(False)
