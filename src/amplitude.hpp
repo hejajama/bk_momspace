@@ -25,8 +25,8 @@ const REAL DEFAULT_MAXKTSQR = 1e10; // orig: 1e10
 
 const REAL KTSQRINTACCURACY = 0.001;
 const int KTSQRINTITERATIONS = 12000;
-const int INTERPOLATION_POINTS = 10;
-const int INTERPOLATION_POINTS_DER=50;
+const int INTERPOLATION_POINTS = 20;
+const int INTERPOLATION_POINTS_DER=100;
 
 enum INITIAL_CONDITION
 {
@@ -51,11 +51,9 @@ class Amplitude
         // at all!
         virtual REAL N(REAL ktsqr, REAL y, bool bspline=false);
         void IntializeBSpline(int ktsqrind, REAL rapidity);
-        REAL BSplineAmplitude(REAL ktsqr, REAL rapidity);
 
         REAL SaturationScale(REAL y);
         
-        //REAL BSplineAmplitude(REAL ktsqr, REAL *ktsqrarray, REAL *narray, uint points);
         void AddDataPoint(int ktsqrindex, int yindex, REAL value, REAL der);
         
         REAL LogLogDerivative(REAL ktsqr, REAL y);
@@ -78,6 +76,8 @@ class Amplitude
         void SetKtsqrMultiplier(REAL m);
         void SetMaxY(REAL y);
         void SetDeltaY(REAL dy);
+
+        void SetInterpolationPoints(int p);
 
         void SetRunningCoupling(bool rc);
         bool RunningCoupling();
@@ -107,6 +107,7 @@ class Amplitude
         INITIAL_CONDITION ic;
         bool kinematic_constraint;
         int averages;
+        int interpolation_points;
 
         REAL minktsqr;
         REAL maxktsqr;

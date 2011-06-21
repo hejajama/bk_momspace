@@ -25,7 +25,7 @@ maxx=1e10
 miny=-1.1
 maxy=0.1
 
-scale=1  # 1: scale with Q_s, 0: don't
+scale=0  # 1: scale with Q_s, 0: don't
 
 
 def sqrt_data(x):

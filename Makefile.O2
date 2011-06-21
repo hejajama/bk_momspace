@@ -3,7 +3,8 @@ LDFLAGS = `gsl-config --libs` -lm -L /linuxfs-home/student/hejajama/lib/lib
 
 SOURCES = src/main.cpp src/amplitude.cpp src/tools.cpp src/datafile.cpp \
 	src/solver_force.cpp src/solver_chebyshev.cpp src/chebyshev_amplitude.cpp \
-	src/chebyshev.cpp src/hankel.cpp src/solver_force2.cpp 
+	src/chebyshev.cpp src/hankel.cpp src/solver_force2.cpp \
+	src/interpolation.cpp 
 FFTSOURCES = src/fft4g.c
 LIBBCISOURCES = #libbci-1.1.0/bci.c libbci-1.1.0/tdspl.c libbci-1.1.0/tools.c
 OBJECTS=$(SOURCES:.cpp=.o)

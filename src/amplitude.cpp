@@ -17,6 +17,7 @@
 #include <gsl/gsl_deriv.h>
 #include <gsl/gsl_multifit.h>
 #include <gsl/gsl_min.h>
+#include "interpolation.hpp"
 
 
 #include <cmath>
@@ -37,6 +38,7 @@ Amplitude::Amplitude()
     interpolation_end=-1;
     interpolation_start=-1;
     interpolation_rapidity=-1.0;
+    interpolation_points = INTERPOLATION_POINTS;
 
     running_coupling = false;
 }
@@ -143,20 +145,20 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline)
     // Interpolate linearly in y and use spline in ktsqr
 
     unsigned int interpolation_start, interpolation_end;
-    if (ktsqrind - INTERPOLATION_POINTS/2 < 0)
+    if (ktsqrind - interpolation_points/2 < 0)
     {
 		interpolation_start=0;
-		interpolation_end=INTERPOLATION_POINTS;
+		interpolation_end=interpolation_points;
 	}
-	else if (ktsqrind + INTERPOLATION_POINTS/2 > KtsqrPoints()-2 )
+	else if (ktsqrind + interpolation_points/2 > KtsqrPoints()-2 )
 	{
 		interpolation_end = KtsqrPoints()-1;
-		interpolation_start = KtsqrPoints()-INTERPOLATION_POINTS-2;
+		interpolation_start = KtsqrPoints()-interpolation_points-2;
 	}
 	else
 	{
-		interpolation_start = ktsqrind - INTERPOLATION_POINTS/2;
-		interpolation_end = ktsqrind + INTERPOLATION_POINTS/2;
+		interpolation_start = ktsqrind - interpolation_points/2;
+		interpolation_end = ktsqrind + interpolation_points/2;
 	}
 	int interpo_points = interpolation_end - interpolation_start+1;
     
@@ -181,28 +183,15 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline)
 			
     }
 
-    /*if (bspline==true)
-    {
-        REAL n = BSplineAmplitude(ktsqr, tmparray, tmpxarray, interpo_points);
-        return n;
-    }*/
-    
-    gsl_interp_accel *acc = gsl_interp_accel_alloc();
-    gsl_spline *spline = gsl_spline_alloc(gsl_interp_cspline, interpo_points);
-    gsl_spline_init(spline, tmpxarray, tmparray, interpo_points);
+    Interpolator interp(tmpxarray, tmparray, interpo_points);
+    if (bspline)
+        interp.SetMethod(INTERPOLATE_BSPLINE);
+    interp.Initialize();
+    REAL res = interp.Evaluate(ktsqr);
 
-    REAL res;
-    int status = gsl_spline_eval_e(spline, ktsqr, acc, &res);
-    if (status)
-    {
-        cerr << "Interpolatioin failed at " << LINEINFO << ", error " << gsl_strerror(status)
-         << " (" << status << "), ktsqr=" << ktsqr << ", y=" << y << endl;
-    }
-    gsl_spline_free(spline);
-    gsl_interp_accel_free(acc);
     delete[] tmparray;
     delete[] tmpxarray;
-    //return res;
+    return res;
     /*
     REAL linear = n[ktsqrind][yind] +
         (ktsqr - ktsqrvals[ktsqrind]) *
@@ -215,7 +204,7 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline)
 		cerr << "At ktsqr=" << ktsqr << ", y=" << y << " reldifference " << std::abs(res-linear)/res << endl;
     return linear;
     */
-    return res;
+    //return res;
     
 
 }
@@ -272,23 +261,14 @@ REAL Derivhelperf_loglog(REAL lnktsqr, void* p)
 REAL Amplitude::LogLogDerivative(REAL ktsqr, REAL rapidity)
 {
 
-    //if (std::abs(rapidity-bspline_y)>0.001)
-    //    IntializeBSpline(rapidity);
-
     REAL n1,n2;
-    n1 = BSplineAmplitude(ktsqr, rapidity);
-    n2 = BSplineAmplitude(ktsqr+ktsqr/100.0, rapidity);
-	//n1 = N(ktsqr, rapidity);
-	//n2 = N(ktsqr+ktsqr/100.0, rapidity);
+    SetInterpolationPoints(INTERPOLATION_POINTS_DER);
+	n1 = N(ktsqr, rapidity, true);
+	n2 = N(ktsqr+ktsqr/100.0, rapidity, true);
     
 
    return ktsqr/n1*(n2-n1)/(ktsqr/100.0);
     
-    /* Lowest order, not very accurate 
-    REAL epsilon = ktsqr/1000.0;
-    return ktsqr/epsilon*log(N(ktsqr+epsilon,y)/N(ktsqr, y) );
-    */
-
 
     /* GSL
     REAL lnktsqr = std::log(ktsqr);
@@ -314,189 +294,6 @@ REAL Amplitude::LogLogDerivative(REAL ktsqr, REAL rapidity)
 
 }
 
-void Amplitude::IntializeBSpline(int ktsqrind, REAL rapidity)
-{
-    // Not first time -> free old memory
-    if (interpolation_rapidity>=0.0)
-    {
-        gsl_bspline_free(bw);
-        gsl_vector_free(B);
-        gsl_matrix_free(X);
-        gsl_vector_free(c);
-        
-        gsl_matrix_free(cov);
-        gsl_multifit_linear_free(mw);
-    }
-    
-    // Find ktsqrval and yval indexes refer to index for which
-    // val[index]  is smaller than (or equal) y/ktsqr
-    int yind = -1;
-    for (unsigned int i=0; i<yvals.size()-1; i++)
-    {
-        if (yvals[i]<=rapidity and yvals[i+1]>rapidity)
-        {
-            yind=i;
-            break;
-        }
-    }
-    if (yind < 0) // Didn't find, so refers to the largest one 
-    {
-        yind=yvals.size()-1;
-        if (rapidity-yvals[yind]>0.05)
-            cerr << "Asked derivative at too large Y=" << rapidity << ", falling back to "
-                << " y=" << yvals[yind] << ". " << LINEINFO << endl;
-    }
-    
-    if (ktsqrind - INTERPOLATION_POINTS_DER/2 < 0)
-    {
-		interpolation_start=0;
-		interpolation_end=INTERPOLATION_POINTS_DER;
-	}
-	else if (ktsqrind + INTERPOLATION_POINTS_DER/2 > KtsqrPoints()-2 )
-	{
-		interpolation_end = KtsqrPoints()-1;
-		interpolation_start = KtsqrPoints()-INTERPOLATION_POINTS_DER-2;
-	}
-	else
-	{
-		interpolation_start = ktsqrind - INTERPOLATION_POINTS_DER/2;
-		interpolation_end = ktsqrind + INTERPOLATION_POINTS_DER/2;
-	}
-	int interpo_points = interpolation_end - interpolation_start+1;
-
-
-    gsl_vector *x, *y, *w;
-    x = gsl_vector_alloc(interpo_points);
-    y = gsl_vector_alloc(interpo_points);
-    w = gsl_vector_alloc(interpo_points);
-
-    for (int i=interpolation_start; i<= interpolation_end; i++)
-    {
-		//tmpxarray[i-interpolation_start]=ktsqrvals[i];
-        gsl_vector_set(x, i-interpolation_start, ktsqrvals[i]);
-        
-        gsl_vector_set(w, i-interpolation_start, 1.0);
-
-        //tmpxarray[i-interpolation_start]=ktsqrvals[i];
-        REAL tmpy;
-		
-		if (n[ktsqrind][yind+1]>-eps and rapidity-yvals[yind]>eps)
-        {	// Interpolate in y linearly
-			tmpy=n[i][yind] 
-			 + (rapidity - yvals[yind]) * (n[i][yind+1] - n[i][yind]) / (yvals[yind+1]-yvals[yind]); 
-		}
-        else
-            tmpy = n[i][yind];
-        gsl_vector_set(y, i-interpolation_start, tmpy);
-    }
-    
-    const int ncoeffs = 12;
-    const int nbreak = ncoeffs-2; // k=4
-     
-    /* allocate a cubic bspline workspace (k = 4) */
-    bw = gsl_bspline_alloc(4, nbreak);
-    B = gsl_vector_alloc(ncoeffs);
-       
-    X = gsl_matrix_alloc(interpo_points, ncoeffs);
-    c = gsl_vector_alloc(ncoeffs);
-       
-    cov = gsl_matrix_alloc(ncoeffs, ncoeffs);
-    mw = gsl_multifit_linear_alloc(interpo_points, ncoeffs);
-     
-     
-    // use uniform breakpoints on 
-    gsl_bspline_knots_uniform(ktsqrvals[interpolation_start],
-            ktsqrvals[interpolation_end], bw);
-     
-    /* construct the fit matrix X */
-    for (int i = 0; i < interpo_points; ++i)
-    {
-       double xi = gsl_vector_get(x, i);
-     
-       /* compute B_j(xi) for all j */
-       gsl_bspline_eval(xi, B, bw);
-     
-       /* fill in row i of X */
-       for (int j = 0; j < ncoeffs; ++j)
-       {
-          double Bj = gsl_vector_get(B, j);
-          gsl_matrix_set(X, i, j, Bj);
-       }
-    }
-     
-    /* do the fit */
-    REAL chisq;
-    gsl_multifit_wlinear(X, w, y, c, cov, &chisq, mw);
-
-    gsl_vector_free(x);
-    gsl_vector_free(y);
-    gsl_vector_free(w);
-
-    interpolation_rapidity=rapidity;
-}
-
-
-
-REAL Amplitude::BSplineAmplitude(REAL ktsqr, REAL rapidity)
-{
-    /*REAL n,yerr;
-    gsl_bspline_eval(ktsqr, B, bw);
-    gsl_multifit_linear_est(B, c, cov, &n, &yerr);
-    return n;
-    */
-
-    
-    // Find ktsqrval and yval indexes refer to index for which
-    // val[index]  is smaller than (or equal) y/ktsqr
-    int yind = -1;
-    for (unsigned int i=0; i<yvals.size()-1; i++)
-    {
-        if (yvals[i]<=rapidity and yvals[i+1]>rapidity)
-        {
-            yind=i;
-            break;
-        }
-    }
-    if (yind < 0) // Didn't find, so refers to the largest one 
-    {
-        yind=yvals.size()-1;
-        if (rapidity-yvals[yind]>0.05)
-            cerr << "Asked derivative at too large Y=" << rapidity << ", falling back to "
-                << " y=" << yvals[yind] << ". " << LINEINFO << endl;
-    }
-    int ktsqrind=-1;
-    for (unsigned int i=0; i<ktsqrvals.size()-1; i++)
-    {
-        if (ktsqrvals[i]<=ktsqr and ktsqrvals[i+1]>ktsqr)
-        {
-            ktsqrind=i;
-            break;
-        }
-    }
-    if (ktsqrind < 0) // Didn't find, so refers to the largest one 
-    {
-        ktsqrind=ktsqrvals.size()-1;
-        if (ktsqr - ktsqrvals[ktsqrvals.size()-1] > 100)
-            cerr << "Asked derivative at too large ktsqr=" << ktsqr << ", falling back to "
-                << " ktsqr=" << ktsqrvals[ktsqrind] << ". " << LINEINFO << endl;
-    }
-
-    /*if (ktsqrind < interpolation_start+10 or ktsqrind > interpolation_end - 10
-        or std::abs(rapidity < interpolation_rapidity) > 0.01)
-    {
-        IntializeBSpline(ktsqrind, rapidity);
-    }*/
-    IntializeBSpline(ktsqrind, rapidity);
-   
-    
-
-    REAL n1,yerr;
-    gsl_bspline_eval(ktsqr, B, bw);
-    gsl_multifit_linear_est(B, c, cov, &n1, &yerr);
-
-    return n1;
-
-}
 
 /*
  * Saturation Scale
@@ -520,15 +317,15 @@ struct Sathelper
 REAL SaturationHelperf(REAL ktsqr, void* p)
 {
     Sathelper* par = (Sathelper*)p;
-    //return -std::pow(ktsqr, par->gammac)*par->N->N(ktsqr, par->y);
-    return -std::pow(ktsqr, par->gammac)*par->N->BSplineAmplitude(ktsqr, par->y);
+    return -std::pow(ktsqr, par->gammac)*par->N->N(ktsqr, par->y, true);
     
 }
 REAL Amplitude::SaturationScale(REAL y)
 {
     Sathelper helper;
     helper.y=y; helper.N=this;
-    helper.gammac = 0.6275;
+    //helper.gammac = 0.6275;
+    helper.gammac = 0.5;
     
     gsl_function f; f.function=&SaturationHelperf;
     f.params=&helper;
@@ -570,18 +367,6 @@ REAL Amplitude::SaturationScale(REAL y)
 
     return std::sqrt(pos);
 }
-
-/*
-REAL Amplitude::BSplineDerivative(REAL ktsqr, REAL* ktsqrarray, REAL* narray, uint points)
-{
-    REAL n1,n2;
-    n1 = BSplineAmplitude(ktsqr, ktsqrarray, narray, points);
-    n2 = BSplineAmplitude(ktsqr+ktsqr/100.0, ktsqrarray, narray, points);
-    
-
-   return ktsqr/n1*(n2-n1)/(ktsqr/100.0);
-
-}*/
 
 
 REAL Amplitude::InitialCondition(REAL ktsqr)
@@ -771,4 +556,9 @@ void Amplitude::SetRunningCoupling(bool rc)
 bool Amplitude::RunningCoupling()
 {
     return running_coupling;
+}
+
+void Amplitude::SetInterpolationPoints(int p)
+{
+    interpolation_points=p;
 }

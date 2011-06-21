@@ -24,7 +24,7 @@ struct Inthelper_hankel
 REAL Inthelperf_hankel(REAL k, void* p)
 {
     Inthelper_hankel* par = (Inthelper_hankel*)p;
-    return k*gsl_sf_bessel_j0(k* par->r) * par->N->BSplineAmplitude(SQR(k), par->y);
+    return k*gsl_sf_bessel_j0(k* par->r) * par->N->N(SQR(k), par->y, true);
 }
 
 void Hankel::PrintRAmplitude()

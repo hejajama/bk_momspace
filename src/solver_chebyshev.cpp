@@ -32,7 +32,7 @@ void ChebyshevSolver::Solve(REAL maxy)
         cout << "Solving for y=" << tmpy << endl;
         REAL dy = yvals[yind]-yvals[yind-1];
 #pragma omp parallel for
-        for (unsigned int uind=0; uind<=KtsqrPoints(); uind++)
+        for (int uind=0; uind<=KtsqrPoints(); uind++)
         {
             REAL derivative=0;
             derivative = Integrate(uind, yind-1);

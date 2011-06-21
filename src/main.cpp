@@ -517,9 +517,8 @@ void SinglePlot()
     {
         REAL tmpktsqr = N->MinKtsqr()*std::pow(ktsqr_mult, i);
         cout << std::scientific << std::setprecision(15) << tmpktsqr << " " <<
-            std::scientific << std::setprecision(15) << N->N(tmpktsqr, y) << " " <<
-            std::scientific << std::setprecision(15) << N->InitialCondition(tmpktsqr)
-            << " " << std::scientific << std::setprecision(15) << N->BSplineAmplitude(tmpktsqr, y) << endl;
+            N->N(tmpktsqr, y) << " " << N->InitialCondition(tmpktsqr)
+            << " " << N->N(tmpktsqr, y, true) << endl;
     }
 }
 
