@@ -71,7 +71,7 @@ REAL y_points = 10;
 INITIAL_CONDITION ic=FTIPSAT;
 MODE mode=GENERATE_DATAFILE;
 bool kc=false;  // Kinematical constraint
-bool running_coupling=false;
+RUNNING_COUPLING running_coupling=CONSTANT;
 bool scale_sat=false;  // Scale k_T with the scaturation scale
 
 METHOD method=CHEBYSHEV_SERIES;
@@ -123,6 +123,7 @@ int main(int argc, char* argv[])
         //cout << "-minktsqr, -maxktsqr: range of k_T^2 to plot, doesn't affect to limits when solving BK" << endl;
         cout << "-ic [initial condition]: set initial condition, possible ones are FTIPSAT, INVPOWER, INVPOWER4, GAUSS " << endl;
         cout << "-kc: apply kinematical constraint" << endl;
+        cout << "-rc [METHOD]: apply running coupling, methods: CONSTANT, PARENT, MINK, MAXK" << endl;
         cout << "-rungekutta: use 2nd order runge kutta (only with method BRUTEFORCE)" << endl;
         cout << "-avg [avgs]: number or averagements" << endl;
         cout << "-data [datafile]: read data from datafiles from path datafile_y[rapdity].dat" << endl;
@@ -131,7 +132,6 @@ int main(int argc, char* argv[])
         cout << "-load_matrix [filename], -save_matrix [filename]: load/save coefficient matrix (CHEBYSHEV method)" << endl;
         cout << "-chebyshev_degree [number]: number of basis vectors" << endl;
         cout << "-minktsqr [val], -maxktsqr [val], -ktsqrpoints [val]" << endl;
-        cout << "-rc: apply running coupling" << endl;
         cout << "-scale_sat: scale k_T by saturation scale" << endl;
         return 0;
     }
@@ -153,7 +153,21 @@ int main(int argc, char* argv[])
         else if (string(argv[i])=="-kc")
             kc=true;
         else if (string(argv[i])=="-rc")
-            running_coupling=true;
+        {
+            if (string(argv[i+1])=="CONSTANT")
+                running_coupling = CONSTANT;
+            else if (string(argv[i+1])=="PARENT")
+                running_coupling = PARENT_DIPOLE;
+            else if (string(argv[i+1])=="MAXK")
+                running_coupling = MAXK;
+            else if (string(argv[i+1])=="MINK")
+                running_coupling = MINK;
+            else
+            {
+                cerr << "Unrecognized running coupling " << argv[i+1] << ", exiting..." << endl;
+                return -1;
+            }
+        }
         else if (string(argv[i])=="-rungekutta")
             rungekutta = true;
         else if (string(argv[i])=="-scale_sat")
@@ -258,7 +272,7 @@ int main(int argc, char* argv[])
     else if (method==CHEBYSHEV_SERIES) N = new ChebyshevAmplitudeSolver;
 
     N->SetInitialCondition(ic);
-    N->SetRunningCoupling(PARENT_DIPOLE);
+    N->SetRunningCoupling(running_coupling);
     N->SetKinematicConstraint(kc);
     N->SetMaxY(maxy);
     N->SetMaxKtsqr(maxktsqr);
@@ -281,8 +295,7 @@ int main(int argc, char* argv[])
 
     infostr << "# Kinematical constraint is ";
     if (kc) infostr << "applied"; else infostr << "not applied"; infostr << endl;
-    infostr << "# Running coupling is ";
-    if (N->RunningCoupling()) infostr << "applied"; else infostr << "not applied"; infostr << endl;
+    infostr << "# Running coupling is " << N->RunningCouplingStr() << endl;
 
     infostr << "# Initial condition: " << N->InitialConditionStr() <<  endl;
     infostr << "# Grid size: ktsqrpoints x ypoints = " << N->KtsqrPoints() << " x " << N->YPoints()
@@ -562,7 +575,7 @@ void SaturationScale()
     REAL *yarray = new REAL[points];
     REAL *qsarray = new REAL[points];
 
-    const int interpolation_points=80;
+    const int interpolation_points=20;
     int interpolation_start, interpolation_end;
     
     for (int i=0; i<points; i++)
@@ -592,7 +605,7 @@ void SaturationScale()
         }
         
         Interpolator inter(yarray, qsarray, interpo_points);
-        inter.SetMethod(INTERPOLATE_BSPLINE);
+        //inter.SetMethod(INTERPOLATE_BSPLINE);
         inter.Initialize();
         
         REAL tmpy = 0.1*i;

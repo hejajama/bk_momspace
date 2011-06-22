@@ -423,6 +423,25 @@ string Amplitude::InitialConditionStr()
     }
 }
 
+string Amplitude::RunningCouplingStr()
+{
+    if (datafile==true)
+	{
+		return "Data is read from a file, don't know what running coupling was used";
+	}
+    switch (running_coupling)
+    {
+    case CONSTANT:
+        return "Constant";
+    case PARENT_DIPOLE:
+        return "Parent dipole";
+    case MINK:
+        return "MINK";
+    case MAXK:
+        return "MAXK";
+    }
+}
+
 
 int Amplitude::ReadData(string file)
 {

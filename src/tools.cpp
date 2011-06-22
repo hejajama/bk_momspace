@@ -66,4 +66,7 @@ REAL Alpha_s(REAL Qsqr)
     return alpha;
 }
 
-
+REAL Alphabar_s(REAL Qsqr)
+{
+    return Alpha_s(Qsqr)*Nc/M_PI;
+}

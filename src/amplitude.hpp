@@ -40,6 +40,7 @@ enum RUNNING_COUPLING
 {
     PARENT_DIPOLE,      // scale of the parent dipole
     MAXK,               // max of {k,k'}, in NL term just k
+    MINK,               // min of {k,k'}
     CONSTANT            // no running
 };
 
@@ -75,7 +76,10 @@ class Amplitude
         void SetInitialCondition(INITIAL_CONDITION i);
         void SetKinematicConstraint(bool kc);
         bool KinematicalConstraint();
+
         string InitialConditionStr();
+        string RunningCouplingStr();
+        
         void SetNumberOfAveragements(int avg);
 
         void SetMinKtsqr(REAL mkt);

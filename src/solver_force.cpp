@@ -72,9 +72,11 @@ REAL inthelperf_bkmom_noconstraint(REAL ktsqr, void* p)
 
     result /= ktsqr;
 
+    if (par->N->RunningCoupling() == MAXK)
+        result *= Alphabar_s(std::max(ktsqr, par->ktsqr));
+    else if (par->N->RunningCoupling() == MINK)
+        result *= Alphabar_s(std::min(ktsqr, par->ktsqr));
     
-    
-    //cout << ktsqr << "  " << result << endl;
     return result;
 }
 
@@ -128,13 +130,7 @@ REAL inthelperf_bkmom_constraint(REAL ktsqr, void* p)
  *
  */
 REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y, REAL offset)
-{
-    REAL alphabar=1.0;
-    if (RunningCoupling()==CONSTANT)
-        alphabar = 0.2;
-    if (RunningCoupling()==PARENT_DIPOLE)
-        alphabar = Alpha_s(ktsqr)*Nc/M_PI;
-    
+{    
     inthelper_bkmom inthelp;
     inthelp.N=this;
     inthelp.y=y;
@@ -174,14 +170,47 @@ REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y, REAL offset)
 
     // Nonlinear term
     result -= SQR(N(ktsqr, y));
+
+    if (RunningCoupling()==CONSTANT)
+        result*=0.2;
+    if (RunningCoupling()==PARENT_DIPOLE or RunningCoupling()==MAXK
+        or RunningCoupling() == MINK)
+        result *= Alphabar_s(ktsqr);
     
-    return alphabar*result;
+    return result;
+}
+/*
+ * GSL ODEIV evolution
+ * Returns RapidityDerivative for every ktsqr in vector
+ * TODO: Doesn't probably work with kinematical constraint, does it?
+ *
+ */
+struct EvolutionHelper
+{
+    BruteForceSolver* N;
+};
+int Evolve(REAL y, const REAL amplitude[], REAL result[], void *params)
+{
+    cout << "Evolving with y=" << y << endl;
+    EvolutionHelper* helper = (EvolutionHelper*)params;
+   // Actually we don't need amplitude[] as it only contains
+   // elements N[ktsqrind][yind], but GSL uses it to determine whether
+   // the volution is accurate 
+   #pragma omp parallel for
+   for( int i=0 ; i<helper->N->KtsqrPoints() ; i++) {
+      result[i] = helper->N->RapidityDerivative(helper->N->Ktsqrval(i), y);
+   }
+   return GSL_SUCCESS;
 }
 
 
 // Solve BK, lowest order
 void BruteForceSolver::Solve(REAL maxy)
 {
+    if (averages>0)
+    {
+        cerr << "Averagement is disabled..." << endl;
+    }
     // Find maxyind corresponding to maxy
     int maxyind=YPoints();
     for (unsigned int i=1; i<=YPoints(); i++)
@@ -190,82 +219,147 @@ void BruteForceSolver::Solve(REAL maxy)
             { maxyind=i; break; }
     }
     int largedifference=0;
+
+    // **** used in GSL solver *****
+    const gsl_odeiv_step_type * T = gsl_odeiv_step_rkf45;
+
+    gsl_odeiv_step * s    = gsl_odeiv_step_alloc (T, KtsqrPoints());
+    gsl_odeiv_control * c = gsl_odeiv_control_y_new (0.0, 0.05);    //abserr relerr
+    gsl_odeiv_evolve * e  = gsl_odeiv_evolve_alloc (KtsqrPoints());
+    EvolutionHelper help; help.N=this;
+    gsl_odeiv_system sys = {Evolve, NULL, KtsqrPoints(), &help};
+    REAL Y=0;
+    REAL Yi=0;
+    REAL h = 0.1;   // Original step size
+    REAL *amplitude=new REAL[KtsqrPoints()];
+    for (int ktsqrind=0; ktsqrind < KtsqrPoints(); ktsqrind++)
+    {
+        amplitude[ktsqrind] = n[ktsqrind][0];
+    }
+    
+    // ******************************
     for (int yind=1; yind<=maxyind; yind++)
     {
         cerr << "Solving for y=" << yvals[yind] << endl;
         // Solve N(y+DELTA_Y, kt) for every kt
 
-#pragma omp parallel for
-        for (int ktsqrind=0; ktsqrind<KtsqrPoints(); ktsqrind++)
+        // Use RungeKutta = GSL ODEIV system, doesn't work (yet?) with kin.
+        // constraint
+        if (rungekutta)
         {
-            REAL tmpkt = ktsqrvals[ktsqrind];
-            REAL dy = yvals[yind]-yvals[yind-1];
-            REAL tmpder = RapidityDerivative(tmpkt, yvals[yind-1]);
-            REAL newn=n[ktsqrind][yind-1] + dy*tmpder;
 
-            // Adams method: apprximate derivative as a 2nd order polynomial
-            // Y_{i+1} = y_i + hf_i + 1/2 h (f_i - f_{i-1} )
-            // We can use this only for yind>1
-            if (yind>1 and adams_method==true)
+            Yi = yvals[yind];
+            // gsl_odeiv_evolve_apply increases Y according to the step size
+            // why gsl_odeiv_evolve_apply doesn't set Y=Y_i at the end? 
+            while (Y<Yi)
             {
-                REAL old_der = derivatives[ktsqrind][yind-2];
-                newn = n[ktsqrind][yind-1] + dy*tmpder
-                    + 1.0/2.0*dy*( tmpder - old_der);
+                int status = gsl_odeiv_evolve_apply (e, c, s, &sys, 
+                                &Y, Yi, &h, amplitude);
+                if (status != GSL_SUCCESS) {
+                    cerr << "Error in gsl_odeiv_evolve_apply at " << LINEINFO
+                        << ": " << gsl_strerror(status) << " (" << status << ")"
+                        << " y=" << Y << ", h=" << h << endl;
+             }
+                cout << "Evolved up to " << Y << "/" << Yi << ", h=" << h << endl;
+            }
+            cout << "Solved yind " << yind << " to Y=" << Y << " with step size "
+                << h << endl;
+            
+      
+            if (std::abs(Y-Yi)>0.05)
+            {
+                cerr << "Y-Y_i is " << Y-Yi << ", Y=" << Y << ", Yi=" << Yi << endl;
+            }
+            for (int ktsqrind=0; ktsqrind < KtsqrPoints(); ktsqrind++)
+            {
+                n[ktsqrind][yind] = amplitude[ktsqrind];
             }
 
-            if (rungekutta and yind>1)
-            {
-                REAL der2 = RapidityDerivative(tmpkt, yvals[yind-1] - dy,
-                        - dy*tmpder);
-                newn = n[ktsqrind][yind-1]
-                    + 3.0/2.0*dy*tmpder - 1.0/2.0*dy*der2;
-            }
             
-            
-            AddDataPoint(ktsqrind, yind, newn, tmpder );
-            if( abs(newn - n[ktsqrind][yind-1])/n[ktsqrind][yind-1] > 0.1)
-            {
-                largedifference++;
-            }
-            //cout << "N(ktsqr=" << ktsqrvals[ktsqrind] <<", y=" << yvals[yind] << ") = " << newn
-            //<< ",  at lower rapidity it was " << n[ktsqrind][yind-1] << endl;
-            
+
         }
-    }
-    cout << endl << "#" << largedifference << " out of " << maxyind * (KtsqrPoints()-1)
-            << " too large differences" << endl;
-    // Again
-    for (int avg=0; avg<averages; avg++)
-    {
-        
-        largedifference=0;
-        for (int yind=1; yind<maxyind-1; yind++)
+        else
         {
-            //cout << "Solving for y=" << yvals[yind] << endl;
-            // Solve N(y+DELTA_Y, kt) for every kt
-            ///TODO: Different iterations are not independent, but the difference
-            /// caused by different order of execution should be higher order?
-#pragma omp parallel for
-            for (int ktsqrind=0; ktsqrind<KtsqrPoints()-1; ktsqrind++)
+
+
+            #pragma omp parallel for
+            for (int ktsqrind=0; ktsqrind<KtsqrPoints(); ktsqrind++)
             {
                 REAL tmpkt = ktsqrvals[ktsqrind];
-                REAL tmpder = RapidityDerivative(tmpkt, yvals[yind]);
                 REAL dy = yvals[yind]-yvals[yind-1];
-                REAL newn = n[ktsqrind][yind-1] + dy*0.5*(tmpder+derivatives[ktsqrind][yind-1]);
+                REAL tmpder = RapidityDerivative(tmpkt, yvals[yind-1]);
+                REAL newn=n[ktsqrind][yind-1] + dy*tmpder;
 
-                if( abs(newn - n[ktsqrind][yind-1])/n[ktsqrind][yind-1] > 0.02)
+                // Adams method: apprximate derivative as a 2nd order polynomial
+                // Y_{i+1} = y_i + hf_i + 1/2 h (f_i - f_{i-1} )
+                // We can use this only for yind>1
+                if (yind>1 and adams_method==true)
+                {
+                    REAL old_der = derivatives[ktsqrind][yind-2];
+                    newn = n[ktsqrind][yind-1] + dy*tmpder
+                        + 1.0/2.0*dy*( tmpder - old_der);
+                }
+
+                if (rungekutta and yind>1)
+                {
+                    /*REAL der2 = RapidityDerivative(tmpkt, yvals[yind-1] - dy,
+                            - dy*tmpder);
+                    newn = n[ktsqrind][yind-1]
+                        + 3.0/2.0*dy*tmpder - 1.0/2.0*dy*der2;
+                    */
+                }
+                
+                
+                AddDataPoint(ktsqrind, yind, newn, tmpder );
+                if( abs(newn - n[ktsqrind][yind-1])/n[ktsqrind][yind-1] > 0.1)
                 {
                     largedifference++;
                 }
-
-                AddDataPoint(ktsqrind, yind, newn, 0.5*(tmpder + derivatives[ktsqrind][yind-1]));
-
+                //cout << "N(ktsqr=" << ktsqrvals[ktsqrind] <<", y=" << yvals[yind] << ") = " << newn
+                //<< ",  at lower rapidity it was " << n[ktsqrind][yind-1] << endl;
                 
             }
         }
+
+        /*
         cout << endl << "#" << largedifference << " out of " << maxyind * (KtsqrPoints()-1)
-            << " too large differences" << endl;
+                << " too large differences" << endl;
+        // Again
+        for (int avg=0; avg<averages; avg++)
+        {
+            
+            largedifference=0;
+            for (int yind=1; yind<maxyind-1; yind++)
+            {
+                //cout << "Solving for y=" << yvals[yind] << endl;
+                // Solve N(y+DELTA_Y, kt) for every kt
+                ///TODO: Different iterations are not independent, but the difference
+                /// caused by different order of execution should be higher order?
+    #pragma omp parallel for
+                for (int ktsqrind=0; ktsqrind<KtsqrPoints()-1; ktsqrind++)
+                {
+                    REAL tmpkt = ktsqrvals[ktsqrind];
+                    REAL tmpder = RapidityDerivative(tmpkt, yvals[yind]);
+                    REAL dy = yvals[yind]-yvals[yind-1];
+                    REAL newn = n[ktsqrind][yind-1] + dy*0.5*(tmpder+derivatives[ktsqrind][yind-1]);
+
+                    if( abs(newn - n[ktsqrind][yind-1])/n[ktsqrind][yind-1] > 0.02)
+                    {
+                        largedifference++;
+                    }
+
+                    AddDataPoint(ktsqrind, yind, newn, 0.5*(tmpder + derivatives[ktsqrind][yind-1]));
+
+                    
+                }
+            }
+            cout << endl << "#" << largedifference << " out of " << maxyind * (KtsqrPoints()-1)
+                << " too large differences" << endl;
+        } */
+    
     }
+
+    delete[] amplitude;
 
 }
 

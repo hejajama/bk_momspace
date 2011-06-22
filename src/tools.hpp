@@ -18,6 +18,7 @@ void ErrHandler(const char * reason,
                         int gsl_errno);
 
 REAL Alpha_s(REAL Qsqr);
+REAL Alphabar_s(REAL Qsqr); // \alpha_s N_C / Pi
 
 #endif
 
