@@ -16,13 +16,14 @@ class BruteForceSolver : public Amplitude
 {
     public:
         void Solve(REAL maxy);
-        REAL RapidityDerivative(REAL ktsqr, REAL y);
+        REAL RapidityDerivative(REAL ktsqr, REAL y, REAL offset=0);
         
+        void SetRungeKutta(bool rk);
 
         BruteForceSolver();
         ~BruteForceSolver();
     private:
-
+        bool rungekutta;
 
 
 };

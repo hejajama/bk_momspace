@@ -5,6 +5,7 @@
 
 #include "amplitude.hpp"
 #include "datafile.hpp"
+#include <algorithm>
 #include "solver_force.hpp"
 #include <vector>
 #include <gsl/gsl_sf_gamma.h>
@@ -28,6 +29,7 @@ struct inthelper_bkmom
     REAL ktsqr;
     Amplitude* N;
     REAL y;
+    REAL offset;
 };
 
 
@@ -48,6 +50,8 @@ REAL inthelperf_bkmom_noconstraint(REAL ktsqr, void* p)
      *  sgn(k'^2 - k^2)/k^2 [N(k^2) + k'^2 N'(k^2) ] + N(k^2)/( Sqrt[5] k^2 )
      */
 
+    REAL kn = par->ktsqr * (par->N->N(par->ktsqr, par->y) - par->offset );
+
     if (std::abs(ktsqr - par->ktsqr) < 1e-15)
     {
         //cerr << "ktsqr \\approx par->ktsqr and we can't handle this! y=" << par->y
@@ -61,12 +65,14 @@ REAL inthelperf_bkmom_noconstraint(REAL ktsqr, void* p)
         */
     }
     else   
-        result += (ktsqr*par->N->N(ktsqr, par->y) - par->ktsqr*par->N->N(par->ktsqr, par->y))
+        result += (ktsqr*par->N->N(ktsqr, par->y) - kn)
             / std::abs(ktsqr - par->ktsqr);
     
-    result += par->ktsqr * par->N->N(par->ktsqr, par->y) / sqrt( 4.0*SQR(ktsqr) + SQR(par->ktsqr));
+    result += kn / sqrt( 4.0*SQR(ktsqr) + SQR(par->ktsqr));
 
     result /= ktsqr;
+
+    
     
     //cout << ktsqr << "  " << result << endl;
     return result;
@@ -111,16 +117,29 @@ REAL inthelperf_bkmom_constraint(REAL ktsqr, void* p)
     return result;
 }
 
-REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y)
+/*
+ * Calculate \partial_Y N
+ * offset is used in 2nd order Runge Kutta where the derivative
+ * \partial_Y N(Y) = F(Y, N(Y)) is evaluated at point
+ * F(Y-\delta Y, N(Y) - \delta Y F(Y, N(Y)) )
+ * It's default value is 0
+ * NB: It can't be used with the kinematical constraint as in that case the
+ * equation is not local in Y
+ *
+ */
+REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y, REAL offset)
 {
-    REAL alphabar=0.2;
-    if (RunningCoupling())
+    REAL alphabar=1.0;
+    if (RunningCoupling()==CONSTANT)
+        alphabar = 0.2;
+    if (RunningCoupling()==PARENT_DIPOLE)
         alphabar = Alpha_s(ktsqr)*Nc/M_PI;
     
     inthelper_bkmom inthelp;
     inthelp.N=this;
     inthelp.y=y;
     inthelp.ktsqr = ktsqr;
+    inthelp.offset=offset;
     gsl_function int_helper;
 
     if (kinematic_constraint==false)
@@ -193,6 +212,14 @@ void BruteForceSolver::Solve(REAL maxy)
                 newn = n[ktsqrind][yind-1] + dy*tmpder
                     + 1.0/2.0*dy*( tmpder - old_der);
             }
+
+            if (rungekutta and yind>1)
+            {
+                REAL der2 = RapidityDerivative(tmpkt, yvals[yind-1] - dy,
+                        - dy*tmpder);
+                newn = n[ktsqrind][yind-1]
+                    + 3.0/2.0*dy*tmpder - 1.0/2.0*dy*der2;
+            }
             
             
             AddDataPoint(ktsqrind, yind, newn, tmpder );
@@ -244,9 +271,14 @@ void BruteForceSolver::Solve(REAL maxy)
 
 BruteForceSolver::BruteForceSolver()
 {
-
+    rungekutta = false;
 }
 BruteForceSolver::~BruteForceSolver()
 {
 
+}
+
+void BruteForceSolver::SetRungeKutta(bool rk)
+{
+    rungekutta = rk;
 }

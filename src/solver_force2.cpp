@@ -112,7 +112,7 @@ REAL inthelperf_bkmom2_constraint(REAL ktsqr, void* p)
 REAL BruteForceSolver2::RapidityDerivative(REAL u, REAL y)
 {
     REAL alphabar=0.2;
-    if (RunningCoupling())
+    if (RunningCoupling()==PARENT_DIPOLE)
         alphabar = Alpha_s(Ktsqr(u))*Nc/M_PI;
     
     inthelper_bkmom2 inthelp;

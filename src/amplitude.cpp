@@ -40,7 +40,7 @@ Amplitude::Amplitude()
     interpolation_rapidity=-1.0;
     interpolation_points = INTERPOLATION_POINTS;
 
-    running_coupling = false;
+    running_coupling = CONSTANT;
 }
 
 /*
@@ -324,8 +324,8 @@ REAL Amplitude::SaturationScale(REAL y)
 {
     Sathelper helper;
     helper.y=y; helper.N=this;
-    //helper.gammac = 0.6275;
-    helper.gammac = 0.5;
+    helper.gammac = 0.6275;
+    //helper.gammac = 0.5;
     
     gsl_function f; f.function=&SaturationHelperf;
     f.params=&helper;
@@ -548,12 +548,12 @@ Amplitude::~Amplitude()
     
 }
 
-void Amplitude::SetRunningCoupling(bool rc)
+void Amplitude::SetRunningCoupling(RUNNING_COUPLING rc)
 {
     running_coupling=rc;
 }
 
-bool Amplitude::RunningCoupling()
+RUNNING_COUPLING Amplitude::RunningCoupling()
 {
     return running_coupling;
 }

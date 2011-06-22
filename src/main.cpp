@@ -13,6 +13,7 @@
 #include "tools.hpp"
 #include "chebyshev.hpp"
 #include "hankel.hpp"
+#include "interpolation.hpp"
 #include <gsl/gsl_errno.h>
 #include <cmath>
 #include <fstream>
@@ -80,6 +81,7 @@ bool read_data=false;
 string datafile="output";
 int avg=0;
 string file_prefix="output";
+bool rungekutta = false;
 
 // Parameters for ChebyshevAmplitudeSolver
 int chebyshev_degree=100;
@@ -121,6 +123,7 @@ int main(int argc, char* argv[])
         //cout << "-minktsqr, -maxktsqr: range of k_T^2 to plot, doesn't affect to limits when solving BK" << endl;
         cout << "-ic [initial condition]: set initial condition, possible ones are FTIPSAT, INVPOWER, INVPOWER4, GAUSS " << endl;
         cout << "-kc: apply kinematical constraint" << endl;
+        cout << "-rungekutta: use 2nd order runge kutta (only with method BRUTEFORCE)" << endl;
         cout << "-avg [avgs]: number or averagements" << endl;
         cout << "-data [datafile]: read data from datafiles from path datafile_y[rapdity].dat" << endl;
         cout << "  -maxdatay [yval]: set maximum y value for datafiles, -delta_datay [yval] difference of yvals for datafiles" << endl;
@@ -151,6 +154,8 @@ int main(int argc, char* argv[])
             kc=true;
         else if (string(argv[i])=="-rc")
             running_coupling=true;
+        else if (string(argv[i])=="-rungekutta")
+            rungekutta = true;
         else if (string(argv[i])=="-scale_sat")
             scale_sat=true;
         else if (string(argv[i])=="-avg")
@@ -253,7 +258,7 @@ int main(int argc, char* argv[])
     else if (method==CHEBYSHEV_SERIES) N = new ChebyshevAmplitudeSolver;
 
     N->SetInitialCondition(ic);
-    N->SetRunningCoupling(running_coupling);
+    N->SetRunningCoupling(PARENT_DIPOLE);
     N->SetKinematicConstraint(kc);
     N->SetMaxY(maxy);
     N->SetMaxKtsqr(maxktsqr);
@@ -329,6 +334,12 @@ int main(int argc, char* argv[])
             }
             else
             {
+                if (rungekutta)
+                {
+                    ((BruteForceSolver*)N)->SetRungeKutta(true);
+                    infostr << "# 2nd order Runge Kutta is applied" << endl;
+                    cout << "# 2nd order Runge Kutta is applied" << endl;
+                }
                 cout << "# Generating data..." << endl;
                 ((BruteForceSolver*)N)->Solve(maxy);
             }
@@ -544,10 +555,52 @@ void SinglePlotR()
 void SaturationScale()
 {
     cout << "# Saturation scale Q_s as a function of y" << endl;
-    cout << "# y  Q_s " << endl;
-    for (REAL tmpy=0; tmpy<maxy; tmpy += 0.1)
+    cout << "# y  Bspline-Q_s Q_s " << endl;
+
+    // Bspline interpolation
+    int points = static_cast<int>(maxy/0.1);
+    REAL *yarray = new REAL[points];
+    REAL *qsarray = new REAL[points];
+
+    const int interpolation_points=80;
+    int interpolation_start, interpolation_end;
+    
+    for (int i=0; i<points; i++)
     {
-        cout << std::scientific << std::setprecision(15) << tmpy << " " << N->SaturationScale(tmpy) << endl;
+        if (i-interpolation_points/2<0)
+        {
+            interpolation_start=0; interpolation_end=interpolation_points-1;
+        }
+        else if (i+interpolation_points/2 > points)
+        {
+            interpolation_end = points-1;
+            interpolation_start = points-1-interpolation_points;
+        }
+        else
+        {
+            interpolation_start = i-interpolation_points/2;
+            interpolation_end = i+interpolation_points/2;
+        }
+        int interpo_points = interpolation_end - interpolation_start + 1;
+
+        REAL *yarray = new REAL[interpo_points];
+        REAL *qsarray = new REAL[interpo_points];
+        for (int j=interpolation_start; j<=interpolation_end; j++)
+        {
+            yarray[j-interpolation_start] = j*0.1;
+            qsarray[j-interpolation_start] = N->SaturationScale(j*0.1);
+        }
+        
+        Interpolator inter(yarray, qsarray, interpo_points);
+        inter.SetMethod(INTERPOLATE_BSPLINE);
+        inter.Initialize();
+        
+        REAL tmpy = 0.1*i;
+        cout << std::scientific << std::setprecision(15) << tmpy << " "
+            << inter.Evaluate(tmpy) << " " << N->SaturationScale(tmpy) << endl;
+
+        delete[] yarray;
+        delete[] qsarray;
     }
 }
 

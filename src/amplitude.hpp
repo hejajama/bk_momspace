@@ -35,7 +35,14 @@ enum INITIAL_CONDITION
     INVPOWER4,  // 1/(k^4+1), very arbitrary
     GAUSS       // Exp[-(Log[k^2] + 2)^2/5], hep-ph/0110325
 };
-    
+
+enum RUNNING_COUPLING
+{
+    PARENT_DIPOLE,      // scale of the parent dipole
+    MAXK,               // max of {k,k'}, in NL term just k
+    CONSTANT            // no running
+};
+
 
 class Amplitude
 {
@@ -79,8 +86,8 @@ class Amplitude
 
         void SetInterpolationPoints(int p);
 
-        void SetRunningCoupling(bool rc);
-        bool RunningCoupling();
+        void SetRunningCoupling(RUNNING_COUPLING rc);
+        RUNNING_COUPLING RunningCoupling();
 
         unsigned int YPoints();
         unsigned int KtsqrPoints();
@@ -115,7 +122,7 @@ class Amplitude
         REAL maxy;
         REAL delta_y;
 
-        bool running_coupling;
+        RUNNING_COUPLING running_coupling;
 
         bool datafile;	// True if data is read from external file
 
