@@ -47,13 +47,13 @@ void ChebyshevSolver::Solve(REAL maxy)
             // Adams method: apprximate derivative as a 2nd order polynomial
             // Y_{i+1} = y_i + hf_i + 1/2 h (f_i - f_{i-1} )
             // We can use this only for yind>1
-            if (yind>1 and adams_method==true)
+            /*if (yind>1 and adams_method==true)
             {
                 REAL old_der = derivatives[uind][yind-2];
                 newn = N(ktsqrvals[uind], yvals[yind-1]) + dy*derivative
                     + 1.0/2.0*dy*( derivative - old_der);
             }
-           else
+           else*/
                 newn = N(ktsqrvals[uind], yvals[yind-1]) + dy*derivative;
 
             AddDataPoint(uind, yind, newn, derivative);

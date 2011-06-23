@@ -34,7 +34,6 @@ Amplitude::Amplitude()
     delta_y = DEFAULT_DELTA_Y;
     averages=0;
     datafile=false;
-    adams_method=false;
     interpolation_end=-1;
     interpolation_start=-1;
     interpolation_rapidity=-1.0;
@@ -150,9 +149,9 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline)
 		interpolation_start=0;
 		interpolation_end=interpolation_points;
 	}
-	else if (ktsqrind + interpolation_points/2 > KtsqrPoints()-2 )
+	else if (ktsqrind + interpolation_points/2 > KtsqrPoints()-1 )
 	{
-		interpolation_end = KtsqrPoints()-1;
+		interpolation_end = KtsqrPoints();
 		interpolation_start = KtsqrPoints()-interpolation_points-2;
 	}
 	else
@@ -234,7 +233,7 @@ void Amplitude::AddDataPoint(int ktsqrindex, int yindex, REAL value, REAL der)
             << yindex << ". " << LINEINFO << endl; */
     n[ktsqrindex][yindex]=value;
 
-    if (yindex>=0)
+    if (yindex>=1)
         derivatives[ktsqrindex][yindex-1]=der;
     else
         cerr << "Added data point with yindex=" << yindex << " " << LINEINFO << endl;

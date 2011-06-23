@@ -18,13 +18,13 @@ const unsigned int DEFAULT_MAXY=50;
 const REAL DEFAULT_KTSQR_MULTIPLIER = 1.01;  // ktsqr_{i+1} = ktsqr_i*KTSQR_MULTIPLIER
 //const REAL DEFAULT_KTSQR_MULTIPLIER = 1.05;
 const REAL DEFAULT_MINKTSQR = 1e-8; // orig: 1e-8
-const REAL DEFAULT_MAXKTSQR = 1e10; // orig: 1e10
+const REAL DEFAULT_MAXKTSQR = 1e30; 
 
 //const unsigned int POINTS_Y= (int)(MAXY/DELTA_Y);
 //const unsigned int POINTS_KTSQR = (int)(std::log(MAXKTSQR/MINKTSQR) / std::log(KTSQR_MULTIPLIER) );
 
-const REAL KTSQRINTACCURACY = 0.001;
-const int KTSQRINTITERATIONS = 12000;
+const REAL KTSQRINTACCURACY = 0.01;  //0.001;
+const int KTSQRINTITERATIONS = 1000; //12000;
 const int INTERPOLATION_POINTS = 20;
 const int INTERPOLATION_POINTS_DER=100;
 
@@ -129,8 +129,6 @@ class Amplitude
         RUNNING_COUPLING running_coupling;
 
         bool datafile;	// True if data is read from external file
-
-        bool adams_method;   // Whether the Adams method should be used when solvin DE
 
         // Bspline interpolation
         REAL bspline_y;

@@ -82,6 +82,7 @@ string datafile="output";
 int avg=0;
 string file_prefix="output";
 bool rungekutta = false;
+bool adams = false;
 
 // Parameters for ChebyshevAmplitudeSolver
 int chebyshev_degree=100;
@@ -124,7 +125,7 @@ int main(int argc, char* argv[])
         cout << "-ic [initial condition]: set initial condition, possible ones are FTIPSAT, INVPOWER, INVPOWER4, GAUSS " << endl;
         cout << "-kc: apply kinematical constraint" << endl;
         cout << "-rc [METHOD]: apply running coupling, methods: CONSTANT, PARENT, MINK, MAXK" << endl;
-        cout << "-rungekutta: use 2nd order runge kutta (only with method BRUTEFORCE)" << endl;
+        cout << "-adams_method: use Adams method with BRUTEFORCE)" << endl;
         cout << "-avg [avgs]: number or averagements" << endl;
         cout << "-data [datafile]: read data from datafiles from path datafile_y[rapdity].dat" << endl;
         cout << "  -maxdatay [yval]: set maximum y value for datafiles, -delta_datay [yval] difference of yvals for datafiles" << endl;
@@ -168,8 +169,8 @@ int main(int argc, char* argv[])
                 return -1;
             }
         }
-        else if (string(argv[i])=="-rungekutta")
-            rungekutta = true;
+        else if (string(argv[i])=="-adams_method")
+            adams = true;
         else if (string(argv[i])=="-scale_sat")
             scale_sat=true;
         else if (string(argv[i])=="-avg")
@@ -309,6 +310,7 @@ int main(int argc, char* argv[])
     switch(method)
     {
         case BRUTEFORCE2:
+            cerr << "BRUTEFORCE2, shoudn't be here!" << endl;
             N->SetNumberOfAveragements(avg);
             if (mode != GENERATE_DATAFILE)
             {
@@ -347,11 +349,11 @@ int main(int argc, char* argv[])
             }
             else
             {
-                if (rungekutta)
+                if (adams)
                 {
-                    ((BruteForceSolver*)N)->SetRungeKutta(true);
-                    infostr << "# 2nd order Runge Kutta is applied" << endl;
-                    cout << "# 2nd order Runge Kutta is applied" << endl;
+                    ((BruteForceSolver*)N)->SetAdamsMethod(true);
+                    infostr << "# Adams methdo is used" << endl;
+                    cout << "# Adams methdo is used" << endl;
                 }
                 cout << "# Generating data..." << endl;
                 ((BruteForceSolver*)N)->Solve(maxy);
@@ -477,7 +479,7 @@ void GenerateDataFile()
     output.open(s.str().c_str());
     output << infostr.str();
     cout << "# Saving data to file " << s.str() << endl;
-    output << "# Running coupling: " << N->RunningCoupling() << endl;
+    output << "# Running coupling: " << N->RunningCouplingStr() << endl;
 
     // Metadata (see README for the syntax)
     output << "###" << std::scientific << std::setprecision(15) << N->MinKtsqr() << endl;
@@ -605,7 +607,7 @@ void SaturationScale()
         }
         
         Interpolator inter(yarray, qsarray, interpo_points);
-        //inter.SetMethod(INTERPOLATE_BSPLINE);
+        inter.SetMethod(INTERPOLATE_BSPLINE);
         inter.Initialize();
         
         REAL tmpy = 0.1*i;

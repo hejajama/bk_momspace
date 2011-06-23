@@ -16,14 +16,19 @@ class BruteForceSolver : public Amplitude
 {
     public:
         void Solve(REAL maxy);
-        REAL RapidityDerivative(REAL ktsqr, REAL y, REAL offset=0);
+        REAL RapidityDerivative(REAL ktsqr, REAL y);
         
         void SetRungeKutta(bool rk);
+        void SetAdamsMethod(bool ad);
 
         BruteForceSolver();
         ~BruteForceSolver();
     private:
         bool rungekutta;
+
+        void InitializeAdamsMethod();
+
+        bool adams_method;   // Whether the Adams method should be used when solvin DE
 
 
 };
