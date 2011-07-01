@@ -51,4 +51,5 @@ So there area (dimension+1)^2 lines after the ###dimension line
 Datafiles generated in modes SINGLE_PLOT and LOGLOG_DERIVATIVE contain also
 information about the saturation scale, formatted as:
 ### saturation_scale (NOT squared)
+### saturation_scale defined as N(Q_s) = 0.05 (or something else, see main.cpp)
 It is the first line starting with "###"

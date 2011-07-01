@@ -16,7 +16,9 @@ class BruteForceSolver : public Amplitude
 {
     public:
         void Solve(REAL maxy);
-        REAL RapidityDerivative(REAL ktsqr, REAL y);
+        REAL RapidityDerivative(REAL ktsqr, REAL y, const REAL* array=NULL);
+
+        REAL InterpolateN(REAL ktsqr, const REAL* narray, bool bspline=false, bool der=false);
         
         void SetRungeKutta(bool rk);
         void SetAdamsMethod(bool ad);

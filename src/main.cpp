@@ -83,6 +83,7 @@ int avg=0;
 string file_prefix="output";
 bool rungekutta = false;
 bool adams = false;
+REAL delta_y = DEFAULT_DELTA_Y;
 
 // Parameters for ChebyshevAmplitudeSolver
 int chebyshev_degree=100;
@@ -125,7 +126,9 @@ int main(int argc, char* argv[])
         cout << "-ic [initial condition]: set initial condition, possible ones are FTIPSAT, INVPOWER, INVPOWER4, GAUSS " << endl;
         cout << "-kc: apply kinematical constraint" << endl;
         cout << "-rc [METHOD]: apply running coupling, methods: CONSTANT, PARENT, MINK, MAXK" << endl;
+        cout << "-delta_y [dy]: set delta_y for iterations" << endl;
         cout << "-adams_method: use Adams method with BRUTEFORCE)" << endl;
+        cout << "-rungekutta: use Runge Kutta method (doesn't work with -kc)" << endl;
         cout << "-avg [avgs]: number or averagements" << endl;
         cout << "-data [datafile]: read data from datafiles from path datafile_y[rapdity].dat" << endl;
         cout << "  -maxdatay [yval]: set maximum y value for datafiles, -delta_datay [yval] difference of yvals for datafiles" << endl;
@@ -175,6 +178,8 @@ int main(int argc, char* argv[])
             scale_sat=true;
         else if (string(argv[i])=="-avg")
             avg=StrToInt(argv[i+1]);
+        else if (string(argv[i])=="-rungekutta")
+            rungekutta = true;
         else if (string(argv[i])=="-data")
         {
             read_data=true;
@@ -186,6 +191,8 @@ int main(int argc, char* argv[])
             maxdatay = StrToInt(argv[i+1]);
         else if (string(argv[i])=="-delta_datay")
             delta_datay = StrToReal(argv[i+1]);
+        else if (string(argv[i])=="-delta_y")
+            delta_y = StrToReal(argv[i+1]);
         else if (string(argv[i])=="-minktsqr")
             minktsqr = StrToReal(argv[i+1]);
         else if (string(argv[i])=="-maxktsqr")
@@ -311,26 +318,6 @@ int main(int argc, char* argv[])
     {
         case BRUTEFORCE2:
             cerr << "BRUTEFORCE2, shoudn't be here!" << endl;
-            N->SetNumberOfAveragements(avg);
-            if (mode != GENERATE_DATAFILE)
-            {
-                cout << "# Reading data from file " << datafile << endl;
-                ((BruteForceSolver2*)N)->ReadData(datafile);
-                minktsqr = N->MinKtsqr();
-                maxktsqr = N->MaxKtsqr();
-				ktsqr_mult = N->KtsqrMultiplier();
-                ktsqrpoints = N->KtsqrPoints();
-                cout << "# Data read from file " << datafile <<
-                    " ktsqrlimits " << minktsqr << " - " << maxktsqr
-                    << ", points " << ktsqrpoints << ", multiplier "
-                    << N->KtsqrMultiplier() << endl;
-            }
-            else
-            {
-                cout << "# Generating data..." << endl;
-                ((BruteForceSolver2*)N)->Solve(maxy);
-            }
-            
             break;
         case BRUTEFORCE:
             N->SetNumberOfAveragements(avg);
@@ -349,11 +336,20 @@ int main(int argc, char* argv[])
             }
             else
             {
+                N->SetDeltaY(delta_y);
+                N->Initialize();
                 if (adams)
                 {
                     ((BruteForceSolver*)N)->SetAdamsMethod(true);
                     infostr << "# Adams methdo is used" << endl;
                     cout << "# Adams methdo is used" << endl;
+                }
+                if (rungekutta)
+                {
+                    ((BruteForceSolver*)N)->SetRungeKutta(true);
+                    infostr << "# Runge Kutta is used" << endl;
+                    cout << "# Runge Kutta is used" << endl;
+
                 }
                 cout << "# Generating data..." << endl;
                 ((BruteForceSolver*)N)->Solve(maxy);
@@ -519,11 +515,13 @@ void LogLogDerivative()
     cout << "# d ln N(k^2) / d ln (k^2), y=" << y << endl;
     cout << "# Saturation scale: k_T:" << endl;
     cout << "### " << N->SaturationScale(y) << endl;
+    cout << "# N(k) = " << SATSCALE_N << endl;
+    cout << "### " << N->SolveKtsqr(y, SATSCALE_N) << endl;
 	cout << "#ktsqr derivative " << endl;
 
-	for (int i=0; i<ktsqrpoints-1; i++)
+	for (int i=1; i<N->KtsqrPoints()-1; i++)
 	{
-		REAL tmpktsqr = minktsqr*std::pow(ktsqr_mult, i);
+		REAL tmpktsqr = N->Ktsqrval(i);
 		cout << tmpktsqr << " " << N->LogLogDerivative(tmpktsqr, y) << endl;
 	}
 }
@@ -536,6 +534,8 @@ void SinglePlot()
     cout << "# y=" << y << ", ic=" << N->InitialConditionStr() << endl;
     cout << "# Saturation scale: k_T:" << endl;
     cout << "### " << N->SaturationScale(y) << endl;
+    cout << "# N(k_T)=" << SATSCALE_N << ", when k_T=" << endl;
+    cout << "###" << N->SolveKtsqr(y, SATSCALE_N);
     cout << "# ktsqr amplitude initial_condition bspline_amplitude" << endl;
     ktsqr_mult = N->KtsqrMultiplier();
 
@@ -570,7 +570,7 @@ void SinglePlotR()
 void SaturationScale()
 {
     cout << "# Saturation scale Q_s as a function of y" << endl;
-    cout << "# y  Bspline-Q_s Q_s " << endl;
+    cout << "# y  Bspline-Q_s Q_s N(Q_s)=" << SATSCALE_N << endl;
 
     // Bspline interpolation
     int points = static_cast<int>(maxy/0.1);
@@ -603,7 +603,7 @@ void SaturationScale()
         for (int j=interpolation_start; j<=interpolation_end; j++)
         {
             yarray[j-interpolation_start] = j*0.1;
-            qsarray[j-interpolation_start] = N->SaturationScale(j*0.1);
+            qsarray[j-interpolation_start] =  N->SaturationScale(j*0.1);
         }
         
         Interpolator inter(yarray, qsarray, interpo_points);
@@ -612,7 +612,8 @@ void SaturationScale()
         
         REAL tmpy = 0.1*i;
         cout << std::scientific << std::setprecision(15) << tmpy << " "
-            << inter.Evaluate(tmpy) << " " << N->SaturationScale(tmpy) << endl;
+            << inter.Evaluate(tmpy) << " " << N->SaturationScale(tmpy)
+            << " " << N->SolveKtsqr(tmpy, SATSCALE_N) << endl;
 
         delete[] yarray;
         delete[] qsarray;

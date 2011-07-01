@@ -20,7 +20,7 @@ dashes = ['--', #    : dashed line
           '-.', #   : dash-dot line
           ':', #    : dotted line
            '-']
-colors = [ "black", "blue", "red", '0.35', '0.75']
+colors = [ "black", "blue", "red", '0.35', '0.75', '0.5', '0.1', '0.2', '0.6', '0.8']
 
 textsize = 16
 
@@ -49,7 +49,7 @@ def readfile(file, xlist, ylist,m=1.0,err=[]):
 	f.close()
 
 # Read data from two first columns, ignore others
-def readfile_xy(file, xlist, ylist):
+def readfile_xy(file, xlist, ylist, ycol=1):
     f = open(file,"r")
     lines=f.readlines()
     n=len(lines)
@@ -60,7 +60,7 @@ def readfile_xy(file, xlist, ylist):
         if (len(lines[i])>1 and s[0][0]!="#"):
             #pdb.set_trace()
             xlist.append(float(s[0]))
-            ylist.append(float(s[1]))
+            ylist.append(float(s[ycol]))
     f.close()
 
 # Read parameters from the file

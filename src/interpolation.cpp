@@ -117,6 +117,23 @@ REAL Interpolator::Evaluate(REAL x)
     }
 }
 
+REAL Interpolator::Derivative(REAL x)
+{
+    REAL res, err; int status;
+    switch(method)
+    {
+        case INTERPOLATE_SPLINE:
+            status = gsl_spline_eval_deriv_e(spline, x, acc, &res);
+            break;
+        case INTERPOLATE_BSPLINE:
+            res=0;
+    }
+
+    return res;
+
+
+}
+
 Interpolator::Interpolator(REAL *x, REAL *y, int p)
 {
     points=p;

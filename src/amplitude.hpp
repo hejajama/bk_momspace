@@ -18,15 +18,17 @@ const unsigned int DEFAULT_MAXY=50;
 const REAL DEFAULT_KTSQR_MULTIPLIER = 1.01;  // ktsqr_{i+1} = ktsqr_i*KTSQR_MULTIPLIER
 //const REAL DEFAULT_KTSQR_MULTIPLIER = 1.05;
 const REAL DEFAULT_MINKTSQR = 1e-8; // orig: 1e-8
-const REAL DEFAULT_MAXKTSQR = 1e30; 
+const REAL DEFAULT_MAXKTSQR = 1e30;
+
+const REAL SATSCALE_N = 0.05;
 
 //const unsigned int POINTS_Y= (int)(MAXY/DELTA_Y);
 //const unsigned int POINTS_KTSQR = (int)(std::log(MAXKTSQR/MINKTSQR) / std::log(KTSQR_MULTIPLIER) );
 
 const REAL KTSQRINTACCURACY = 0.01;  //0.001;
-const int KTSQRINTITERATIONS = 1000; //12000;
+const int KTSQRINTITERATIONS = 3000; //1000; //12000;
 const int INTERPOLATION_POINTS = 20;
-const int INTERPOLATION_POINTS_DER=100;
+const int INTERPOLATION_POINTS_DER=50;  // 50 good if 2000 ktsqrpoints, 100 for 5000
 
 enum INITIAL_CONDITION
 {
@@ -61,6 +63,7 @@ class Amplitude
         void IntializeBSpline(int ktsqrind, REAL rapidity);
 
         REAL SaturationScale(REAL y);
+        REAL SolveKtsqr(REAL y, REAL amp);
         
         void AddDataPoint(int ktsqrindex, int yindex, REAL value, REAL der);
         
@@ -100,6 +103,9 @@ class Amplitude
         virtual REAL MinKtsqr();
         virtual REAL MaxKtsqr();
 
+        int KtsqrIndex(REAL ktsqr);
+
+
         REAL InitialCondition(REAL ktsqr);  // N() at y=0
         
     protected:
@@ -138,8 +144,6 @@ class Amplitude
         gsl_matrix *X;
         gsl_matrix *cov;
         gsl_multifit_linear_workspace *mw;
-        int interpolation_start;    // These values are used to cache interpolation
-        int interpolation_end;
         REAL interpolation_rapidity;
         
 };

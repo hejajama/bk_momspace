@@ -107,6 +107,10 @@ void DataFile::GetData(std::vector< std::vector<REAL> > &n)
         }
         n.push_back(tmpvec);
     }
+    std::vector<REAL> tmpvec;
+    for (uint y=0; y<data.size(); y++)
+        tmpvec.push_back(0.0);
+    n.push_back(tmpvec);
 }
 
 REAL DataFile::MinKtsqr()

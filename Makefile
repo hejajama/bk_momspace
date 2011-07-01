@@ -1,4 +1,4 @@
-CXXFLAGS = `gsl-config --cflags` -g -Wall -I /linuxfs-home/student/hejajama/lib/include # -I ./libbci-1.1.0/ 
+CXXFLAGS = `gsl-config --cflags` -g -Wall -I /linuxfs-home/student/hejajama/lib/include -fopenmp# -I ./libbci-1.1.0/ 
 LDFLAGS = `gsl-config --libs` -lm -L /linuxfs-home/student/hejajama/lib/lib 
 
 SOURCES = src/main.cpp src/amplitude.cpp src/tools.cpp src/datafile.cpp \

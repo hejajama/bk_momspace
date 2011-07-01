@@ -5,8 +5,9 @@
 
 #include "amplitude.hpp"
 #include "datafile.hpp"
-#include <algorithm>
+#include "interpolation.hpp"
 #include "solver_force.hpp"
+#include <algorithm>
 #include <vector>
 #include <gsl/gsl_sf_gamma.h>
 #include <gsl/gsl_integration.h>
@@ -27,9 +28,11 @@ using std::abs;
 struct inthelper_bkmom
 {
     REAL lnktsqr;
-    Amplitude* N;
+    BruteForceSolver* N;
     REAL y;
     REAL offset;
+    const REAL* array;    // Array containing values used in Runge Kutta method
+    bool rungekutta;
 };
 
 
@@ -52,8 +55,17 @@ REAL inthelperf_bkmom_noconstraint(REAL lnktsqr, void* p)
      *  sgn(k'^2 - k^2)/k^2 [N(k^2) + k'^2 N'(k^2) ] + N(k^2)/( Sqrt[5] k^2 )
      */
 
-     REAL parn = par->N->N(parktsqr, par->y);
-     REAL n = par->N->N(ktsqr, par->y);
+    REAL parn, n;
+
+    if (par->rungekutta)
+    {
+        parn = par->N->InterpolateN(parktsqr, par->array);
+        n = par->N->InterpolateN(ktsqr, par->array);
+    } else
+    {
+        parn = par->N->N(parktsqr, par->y);
+        n = par->N->N(ktsqr, par->y);
+    }
 
     if (std::abs(lnktsqr - par->lnktsqr) < 1e-15)
     {
@@ -127,13 +139,20 @@ REAL inthelperf_bkmom_constraint(REAL lnktsqr, void* p)
     return result;
 }
 
+/*
+ * Calculate \partial_Y N
+ * If array != NULL (default), then we are using runge kutta and this array
+ * should be used as a N(ktsqr) (doesn't work with kinematicla constraint)
+ */
 
-REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y)
-{    
+REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y, const REAL* array)
+{
     inthelper_bkmom inthelp;
     inthelp.N=this;
     inthelp.y=y;
     inthelp.lnktsqr = std::log(ktsqr);
+    inthelp.array = array;
+    inthelp.rungekutta=rungekutta;
     gsl_function int_helper;
 
     if (kinematic_constraint==false)
@@ -142,9 +161,11 @@ REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y)
         int_helper.function=&inthelperf_bkmom_constraint;
     int_helper.params=&inthelp;
 
-    REAL result, abserr; 
+    REAL result, abserr;
+    int ktsqriter = KTSQRINTITERATIONS;
+    if (ktsqriter >= KtsqrPoints()) ktsqriter = KtsqrPoints()-1;
     gsl_integration_workspace *workspace 
-     = gsl_integration_workspace_alloc(KTSQRINTITERATIONS);
+     = gsl_integration_workspace_alloc(ktsqriter);
 
     REAL minlnktsqr = std::log(ktsqrvals[0]);
     REAL maxlnktsqr = std::log(ktsqrvals[ktsqrvals.size()-2]);
@@ -152,7 +173,7 @@ REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y)
     int status;
     status=gsl_integration_qag(&int_helper, minlnktsqr,
             maxlnktsqr, 0, KTSQRINTACCURACY, 
-            KTSQRINTITERATIONS, GSL_INTEG_GAUSS21, workspace, &result, &abserr);
+            ktsqriter, GSL_INTEG_GAUSS21, workspace, &result, &abserr);
     
     gsl_integration_workspace_free(workspace);
     if (status ) cerr << "Error " << status << " at " << LINEINFO << ":"
@@ -189,7 +210,7 @@ int Evolve(REAL y, const REAL amplitude[], REAL result[], void *params)
    // the volution is accurate 
    #pragma omp parallel for
    for( int i=0 ; i<helper->N->KtsqrPoints() ; i++) {
-      result[i] = helper->N->RapidityDerivative(helper->N->Ktsqrval(i), y);
+      result[i] = helper->N->RapidityDerivative(helper->N->Ktsqrval(i), y, amplitude);
    }
    return GSL_SUCCESS;
 }
@@ -207,6 +228,26 @@ void BruteForceSolver::Solve(REAL maxy)
     }
     int largedifference=0;
     int starty=1;
+
+    // **** used in GSL solver *****
+    const gsl_odeiv2_step_type * T = gsl_odeiv2_step_rkf45;
+
+    gsl_odeiv2_step * s    = gsl_odeiv2_step_alloc (T, KtsqrPoints());
+    gsl_odeiv2_control * c = gsl_odeiv2_control_y_new (0.0, 0.05);    //abserr relerr
+    gsl_odeiv2_evolve * e  = gsl_odeiv2_evolve_alloc (KtsqrPoints());
+    EvolutionHelper help; help.N=this;
+    gsl_odeiv2_system sys = {Evolve, NULL, KtsqrPoints(), &help};
+    REAL Y=0;
+    REAL Yi=0;
+    REAL h = delta_y;   // Original step size
+    REAL *amplitude=new REAL[ktsqrvals.size()];
+    for (int ktsqrind=0; ktsqrind < KtsqrPoints(); ktsqrind++)
+    {
+        amplitude[ktsqrind] = n[ktsqrind][0];
+    }
+    amplitude[ktsqrvals.size()-1]=0;
+
+    
     if (adams_method)
     {
         InitializeAdamsMethod();
@@ -218,7 +259,32 @@ void BruteForceSolver::Solve(REAL maxy)
         cout << "Solving for y=" << yvals[yind] << endl;
         // Solve N(y+DELTA_Y, kt) for every kt
 
-
+        if (rungekutta)
+        {
+            Yi = yvals[yind];
+            // gsl_odeiv_evolve_apply increases Y according to the step size
+            // why gsl_odeiv_evolve_apply doesn't set Y=Y_i at the end?
+            while (Y<Yi)
+            {
+                int status = gsl_odeiv2_evolve_apply(e, c, s, &sys,
+                        &Y, Yi, &h, amplitude);
+                if (status != GSL_SUCCESS) {
+                    cerr << "Error in gsl_odeiv_evolve_apply at " << LINEINFO
+                        << ": " << gsl_strerror(status) << " (" << status << ")"
+                        << " y=" << Y << ", h=" << h << endl;
+                }
+                cout << "Evolved up to " << Y << "/" << Yi << ", h=" << h << endl;
+            } // end while (useless loop?)
+            cout << "Solved yind " << yind << " to Y=" << Y << " with step size "
+                    << h << endl;
+            for (int ktsqrind = 0; ktsqrind < KtsqrPoints(); ktsqrind++)
+            {
+                n[ktsqrind][yind] = amplitude[ktsqrind];
+            }
+            continue;
+        }
+        
+        // If we end up here, we are not using Runge Kutta
 
         #pragma omp parallel for
         for (int ktsqrind=0; ktsqrind<KtsqrPoints(); ktsqrind++)
@@ -299,8 +365,11 @@ void BruteForceSolver::Solve(REAL maxy)
             << " too large differences" << endl;
     } 
     
-    
 
+    gsl_odeiv2_evolve_free(e);
+    gsl_odeiv2_control_free(c);
+    gsl_odeiv2_step_free(s);
+    delete[] amplitude;
 }
 
 
@@ -315,6 +384,7 @@ void BruteForceSolver::InitializeAdamsMethod()
     n.clear();
     REAL y = yvals[1];
     yvals.clear();
+    derivatives.clear();
 
     const int SMALLSTEPS = 10;
 
@@ -373,6 +443,65 @@ void BruteForceSolver::InitializeAdamsMethod()
         n[i][1] = amp[i];
     }
     
+}
+
+/*
+ * InterpolateN
+ * Calculates amplitude at given ktsqr using the given array
+ * array[i] = amplitude at ktsqr=ktsqrvals[i]
+ * If bsplien is true, use bspline, otherwise spline
+ * If der is true, return derivative (TODO: not implemented)
+ * By default bspline and der = false
+ */
+REAL BruteForceSolver::InterpolateN(REAL ktsqr, const REAL* array, bool bspline, bool der)
+{
+    int ktsqrind = KtsqrIndex(ktsqr);
+    if (ktsqr >= MaxKtsqr()) // Didn't find, so refers to the largest one 
+        return array[ktsqrvals.size()-1];
+    if (ktsqr <= MinKtsqr())
+        return array[0];
+
+
+    // Keep y fixed, interpolate ktsqr
+    // Interpolate only INTERPOLATION_POINTS points in order to make this
+    // almost fast
+
+    unsigned int interpolation_start, interpolation_end;
+    
+    if (ktsqrind - interpolation_points/2 < 0)
+    {
+		interpolation_start=0;
+		interpolation_end=interpolation_points;
+	}
+	else if (ktsqrind + interpolation_points/2 > KtsqrPoints()-1 )
+	{
+		interpolation_end = KtsqrPoints();
+		interpolation_start = KtsqrPoints()-interpolation_points-2;
+	}
+	else
+	{
+		interpolation_start = ktsqrind - interpolation_points/2;
+		interpolation_end = ktsqrind + interpolation_points/2;
+	}
+	int interpo_points = interpolation_end - interpolation_start+1;
+    
+    REAL *tmparray = new REAL[interpo_points];
+    REAL *tmpxarray = new REAL[interpo_points];
+    for (int i=interpolation_start; i<= interpolation_end; i++)
+    {
+		tmpxarray[i-interpolation_start]=ktsqrvals[i];
+        tmparray[i-interpolation_start] = array[i];	
+    }
+
+    Interpolator interp(tmpxarray, tmparray, interpo_points);
+    if (bspline)
+        interp.SetMethod(INTERPOLATE_BSPLINE);
+    interp.Initialize();
+    REAL res = interp.Evaluate(ktsqr);
+
+    delete[] tmparray;
+    delete[] tmpxarray;
+    return res;
 }
 
 BruteForceSolver::BruteForceSolver()

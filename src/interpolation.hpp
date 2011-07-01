@@ -32,6 +32,7 @@ class Interpolator
         Interpolator(REAL* x, REAL* y, int p);
         ~Interpolator();
         REAL Evaluate(REAL x);
+        REAL Derivative(REAL x);
         void SetMethod(INTERPOLATION_METHOD m);
         int Initialize();
 

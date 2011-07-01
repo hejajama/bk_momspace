@@ -17,6 +17,7 @@
 #include <gsl/gsl_deriv.h>
 #include <gsl/gsl_multifit.h>
 #include <gsl/gsl_min.h>
+#include <gsl/gsl_roots.h>
 #include "interpolation.hpp"
 
 
@@ -34,8 +35,6 @@ Amplitude::Amplitude()
     delta_y = DEFAULT_DELTA_Y;
     averages=0;
     datafile=false;
-    interpolation_end=-1;
-    interpolation_start=-1;
     interpolation_rapidity=-1.0;
     interpolation_points = INTERPOLATION_POINTS;
 
@@ -53,6 +52,7 @@ void Amplitude::Clear()
     for (unsigned int i=0; i<n.size(); i++)
         n[i].clear();
     n.clear();
+    derivatives.clear();
  
 }
 
@@ -99,7 +99,7 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline)
     // Find ktsqrval and yval indexes refer to index for which
     // val[index]  is smaller than (or equal) y/ktsqr
     int yind = -1;
-    int ktsqrind=-1;
+    int ktsqrind = KtsqrIndex(ktsqr);
     for (unsigned int i=0; i<yvals.size()-1; i++)
     {
         if (yvals[i]<=y and yvals[i+1]>y)
@@ -115,14 +115,7 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline)
             cerr << "Asked amplitude at too large Y=" << y << ", falling back to "
                 << " y=" << yvals[yind] << ". " << LINEINFO << endl;
     }
-    for (unsigned int i=0; i<ktsqrvals.size()-1; i++)
-    {
-        if (ktsqrvals[i]<=ktsqr and ktsqrvals[i+1]>ktsqr)
-        {
-            ktsqrind=i;
-            break;
-        }
-    }
+
     if (ktsqrind < 0) // Didn't find, so refers to the largest one 
     {
         ktsqrind=ktsqrvals.size()-1;
@@ -135,6 +128,15 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline)
     {
         if (yind == yvals.size()-1) return n[0][yind];
         return n[0][yind]+(y-yvals[yind])*(n[0][yind+1]-n[0][yind])
+            / ( yvals[yind+1] - yvals[yind] );
+    }
+
+    if (std::abs(ktsqr - ktsqrvals[ktsqrvals.size()-1])/ktsqrvals[ktsqrvals.size()-1]
+        < 0.001)
+    {
+        if (yind == yvals.size()-1) return n[n.size()-1][yind];
+        return n[n.size()-1][yind]+(y-yvals[yind])
+            *(n[n.size()-1][yind+1]-n[n.size()-1][yind])
             / ( yvals[yind+1] - yvals[yind] );
     }
 
@@ -250,46 +252,76 @@ struct Derivhelper_loglog
     Amplitude* N;
 };
 
-REAL Derivhelperf_loglog(REAL lnktsqr, void* p)
+REAL Derivhelperf_loglog(REAL ktsqr, void* p)
 {
     Derivhelper_loglog* par = (Derivhelper_loglog*)p;
-    REAL ktsqr = std::exp(lnktsqr);
-    return std::log(par->N->N(ktsqr, par->y) );
+    //REAL ktsqr = std::exp(lnktsqr);
+    return par->N->N(ktsqr, par->y, true) ;
 }
 
 REAL Amplitude::LogLogDerivative(REAL ktsqr, REAL rapidity)
 {
 
-    REAL n1,n2;
+    int ktsqrind = KtsqrIndex(ktsqr);
+    if (ktsqrind==0 or ktsqrind >= KtsqrPoints())
+    {
+        cerr << "Can't calculate derivative at the edge of the ktsqr range. "
+                << LINEINFO << endl;
+        return 0;
+    }
+
+    // f'(x) \approx [ f(x+h) - f(x-h) ] / 2h + o(h^2)
     SetInterpolationPoints(INTERPOLATION_POINTS_DER);
-	n1 = N(ktsqr, rapidity, true);
-	n2 = N(ktsqr+ktsqr/100.0, rapidity, true);
-    
+    REAL lnktsqr1 = std::log(ktsqrvals[ktsqrind]);
+    REAL lnktsqr2 = std::log(ktsqrvals[ktsqrind+1]);
+    REAL n1 = std::log(N(ktsqrvals[ktsqrind], rapidity, true) );
+    REAL n2 = std::log(N(ktsqrvals[ktsqrind+1], rapidity, true) );
+    REAL h = lnktsqr2 - lnktsqr1;
+    REAL der = (n2-n1)/h;
 
-   return ktsqr/n1*(n2-n1)/(ktsqr/100.0);
-    
+    return der;
+    //return ktsqr/N(ktsqr, rapidity)*der;
 
-    /* GSL
-    REAL lnktsqr = std::log(ktsqr);
-    REAL h = lnktsqr/100.0;
+    /*
+    
+    const bool bspline = true;
+    SetInterpolationPoints(INTERPOLATION_POINTS_DER);
+    REAL n1 = N(ktsqr, rapidity, true);
+    REAL n2;
+    REAL ktsqr2;
+    if (ktsqr + ktsqr/1000.0 < MaxKtsqr())
+        ktsqr2 = ktsqr + ktsqr/1000.0;
+    else
+        ktsqr2 = ktsqr - ktsqr/1000.0;
+	
+	n2 = N(ktsqr2, rapidity, bspline);
+    SetInterpolationPoints(INTERPOLATION_POINTS);
+
+   return ktsqr/n1*(n2-n1)/(ktsqr2 - ktsqr);
+    */
+    /*
+    // GSL
+    //REAL lnktsqr = std::log(ktsqr);
+    //REAL h = lnktsqr/1000.0;
+    REAL h = (ktsqr - Ktsqrval( KtsqrIndex(ktsqr) + 1) )/2.0;
 
     REAL result,abserr;
     Derivhelper_loglog helper;
-    helper.y=y; helper.N=this;
+    helper.y=rapidity; helper.N=this;
     gsl_function fun;
     fun.function=&Derivhelperf_loglog;
     fun.params = &helper;
-    gsl_deriv_central(&fun, lnktsqr, h, &result, &abserr);
+    gsl_deriv_central(&fun, ktsqr, h, &result, &abserr);
 
-    if (std::abs(abserr/result)>0.1)
+    if (std::abs(abserr/result)>0.2)
     {
         cerr << "Numerical derivation failed at " << LINEINFO
             << ": result=" << result << ", relerr=" << std::abs(abserr/result)
-            << ", ktsqr=" << ktsqr << ", y=" << y << endl;
+            << ", ktsqr=" << ktsqr << ", y=" << rapidity << endl;
     }
     
-    return result;
-    */   
+    return result*ktsqr/n1;;
+    */
 
 }
 
@@ -313,10 +345,13 @@ struct Sathelper
     REAL gammac;
 };
 
-REAL SaturationHelperf(REAL ktsqr, void* p)
+REAL SaturationHelperf(REAL lnktsqr, void* p)
 {
+   
     Sathelper* par = (Sathelper*)p;
-    return -std::pow(ktsqr, par->gammac)*par->N->N(ktsqr, par->y, true);
+    REAL val = -std::pow(std::exp(lnktsqr), par->gammac)
+        *par->N->N(std::exp(lnktsqr), par->y /*, true */);
+    return val;
     
 }
 REAL Amplitude::SaturationScale(REAL y)
@@ -336,11 +371,23 @@ REAL Amplitude::SaturationScale(REAL y)
     // the studied interval
     REAL interval_min = Ktsqrval(1);
     REAL interval_max = Ktsqrval(KtsqrPoints()-2);
-    REAL pos = std::exp( 0.4*y );   // ref: Q_s^2 \sim exp(v_c*Y)
-    if (pos < interval_min) pos = 2.0*interval_min;
-    if (pos>interval_max) pos = 0.5*interval_max;
-    
-    gsl_min_fminimizer_set(s, &f, pos, interval_min, interval_max);
+    REAL pos = SolveKtsqr(y, SATSCALE_N);
+
+    // Find log of saturation scale
+    pos = std::log(pos);
+    interval_min = std::log(interval_min);
+    interval_max = std::log(interval_max);
+
+    gsl_error_handler_t* handler = gsl_set_error_handler_off();
+    if (gsl_min_fminimizer_set(s, &f, pos, interval_min, interval_max)
+        == GSL_EINVAL)
+    {
+        // Endpoints do not enclose a minimum (on the other hand
+        // helper(pos) > helper(min),helper(max), but we can anyway continue
+    }
+    gsl_set_error_handler(handler);
+
+
     int status; int max_iter = 500; int iter=0;
     do
     {
@@ -349,7 +396,7 @@ REAL Amplitude::SaturationScale(REAL y)
         pos = gsl_min_fminimizer_x_minimum(s);
         interval_min = gsl_min_fminimizer_x_lower (s);
         interval_max = gsl_min_fminimizer_x_upper (s);
-        status = gsl_min_test_interval (interval_min, interval_max, 0.0, 0.001);
+        status = gsl_min_test_interval (interval_min, interval_max, 0.0, 0.01);
         
     } while (status == GSL_CONTINUE and iter < max_iter);
 
@@ -364,9 +411,70 @@ REAL Amplitude::SaturationScale(REAL y)
     //cout << "start: " << std::exp(0.4*y) << " min: " << Ktsqrval(1) << " max: " << Ktsqrval(KtsqrPoints()-2)
     //    << " minimumsqr: " << pos << " iterations: " << iter << endl;
 
-    return std::sqrt(pos);
+    return std::sqrt(std::exp(pos));
 }
 
+/*
+ * Return ktsqr for which N(ktsqr, y)=amp
+ * Used in another definition of the saturation scale
+ */
+
+struct KtsqrSolverHelper
+{
+    Amplitude *N;
+    REAL y;
+    REAL amp;
+};
+
+REAL KtsqrSolverHelperF(REAL x, void* p)
+{
+    KtsqrSolverHelper* par = (KtsqrSolverHelper*)p;
+    return par->N->N(x, par->y)-par->amp;
+}
+
+// Find root N(ktsqr, y) - amp = 0
+REAL Amplitude::SolveKtsqr(REAL y, REAL amp)
+{
+    const int MAX_ITER = 200;
+    const REAL ROOTFINDACCURACY = 0.001;
+    KtsqrSolverHelper help;
+    help.N=this; help.y=y; help.amp=amp;
+    gsl_function f;
+    f.params = &help;
+    f.function = &KtsqrSolverHelperF;
+
+    const gsl_root_fsolver_type *T = gsl_root_fsolver_bisection;
+    gsl_root_fsolver *s = gsl_root_fsolver_alloc(T);
+    
+    gsl_root_fsolver_set(s, &f, ktsqrvals[0], ktsqrvals[ktsqrvals.size()-1]);
+    /*cout << "y=" << y <<": min: " << KtsqrSolverHelperF(ktsqrvals[0], &help)
+        << " max: " << KtsqrSolverHelperF(ktsqrvals[ktsqrvals.size()-1], &help)
+        << " minktsqr: " << ktsqrvals[0] << " maxktsqr: " << ktsqrvals[ktsqrvals.size()-1] << endl;
+    */
+    int iter=0; int status; REAL min,max;
+    do
+    {
+        iter++;
+        gsl_root_fsolver_iterate(s);
+        min = gsl_root_fsolver_x_lower(s);
+        max = gsl_root_fsolver_x_upper(s);
+        status = gsl_root_test_interval(min, max, 0, ROOTFINDACCURACY);
+        
+
+    } while (status == GSL_CONTINUE and iter < MAX_ITER);
+
+    if (iter>=MAX_ITER)
+    {
+        cerr << "Solving failed at y=" << y << " at " << LINEINFO << endl;
+    }
+
+    REAL res = gsl_root_fsolver_root(s);
+
+    gsl_root_fsolver_free(s);
+
+    return std::sqrt(res);
+
+}
 
 REAL Amplitude::InitialCondition(REAL ktsqr)
 {
@@ -579,4 +687,23 @@ RUNNING_COUPLING Amplitude::RunningCoupling()
 void Amplitude::SetInterpolationPoints(int p)
 {
     interpolation_points=p;
+}
+
+/* Returns index i for which
+ * ktsqrvals[i]<=ktsqr<ktsqrvals[i+1]
+ * If such index can't be found, returns -1
+ */
+int Amplitude::KtsqrIndex(REAL ktsqr)
+{
+    int ktsqrind=-1;
+    if (ktsqr< MinKtsqr()*0.999999 or ktsqr > MaxKtsqr()*1.000001) return -1;
+    for (unsigned int i=0; i<ktsqrvals.size()-1; i++)
+    {
+        if (ktsqrvals[i]<=ktsqr and ktsqrvals[i+1]>ktsqr)
+        {
+            ktsqrind=i;
+            break;
+        }
+    }
+    return ktsqrind;
 }
