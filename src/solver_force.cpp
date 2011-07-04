@@ -185,8 +185,7 @@ REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y, const REAL* array)
 
     if (RunningCoupling()==CONSTANT)
         result*=0.2;
-    if (RunningCoupling()==PARENT_DIPOLE or RunningCoupling()==MAXK
-        or RunningCoupling() == MINK)
+    if (RunningCoupling()==PARENT_DIPOLE)
         result *= Alphabar_s(ktsqr);
     
     return result;

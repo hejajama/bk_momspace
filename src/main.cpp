@@ -522,7 +522,7 @@ void LogLogDerivative()
     cout << "### " << N->SolveKtsqr(y, SATSCALE_N) << endl;
 	cout << "#ktsqr derivative " << endl;
 
-	for (int i=1; i<N->KtsqrPoints()-1; i++)
+	for (int i=INTERPOLATION_POINTS_DER; i<N->KtsqrPoints()-INTERPOLATION_POINTS_DER; i++)
 	{
 		REAL tmpktsqr = N->Ktsqrval(i);
 		cout << tmpktsqr << " " << N->LogLogDerivative(tmpktsqr, y) << endl;
@@ -537,8 +537,8 @@ void SinglePlot()
     cout << "# y=" << y << ", ic=" << N->InitialConditionStr() << endl;
     cout << "# Saturation scale: k_T:" << endl;
     cout << "### " << N->SaturationScale(y) << endl;
-    cout << "# N(k_T)=" << SATSCALE_N << ", when k_T=" << endl;
-    cout << "###" << N->SolveKtsqr(y, SATSCALE_N);
+    cout << "# N(k_T)=" << SATSCALE_N << ", k_T:" << endl;
+    cout << "###" << N->SolveKtsqr(y, SATSCALE_N) << endl;
     cout << "# ktsqr amplitude initial_condition bspline_amplitude" << endl;
     ktsqr_mult = N->KtsqrMultiplier();
 
@@ -573,7 +573,7 @@ void SinglePlotR()
 void SaturationScale()
 {
     cout << "# Saturation scale Q_s as a function of y" << endl;
-    cout << "# y  Bspline-Q_s Q_s N(Q_s)= bsplineder splineder" << SATSCALE_N << endl;
+    cout << "# y  Bspline-Q_s Q_s N(Q_s)=" << SATSCALE_N << endl;
 
     // Bspline interpolation
     int points = static_cast<int>(maxy/0.1);

@@ -152,7 +152,7 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
 	}
 	else if (ktsqrind + interpolation_points/2 > KtsqrPoints()-2 )
 	{
-		interpolation_end = KtsqrPoints();
+		interpolation_end = KtsqrPoints()-1;
 		interpolation_start = KtsqrPoints()-interpolation_points-3;
 	}
 	else
@@ -164,7 +164,7 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
     // First data point is sometimes somehow off, so don't use bspline
     // with that
     ///TODO: Why?
-    if (interpolation_start==0) { bspline=false; }
+    if (ktsqrind>0 and interpolation_start==0) { interpolation_start=1; }
     
 	int interpo_points = interpolation_end - interpolation_start+1;
     
@@ -192,7 +192,7 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
     for (int i=0; i<interpo_points; i++)
     {
         tmpxarray[i] = std::log(tmpxarray[i]);
-        if (std::abs(tmparray[i]) < 1e-50) tmparray[i]=-9999999;
+        if (std::abs(tmparray[i]) == 0) tmparray[i]=-9999999;
         else tmparray[i] = std::log(tmparray[i]);
     }
         
@@ -205,6 +205,7 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
     if (derivative)
     {
         // Derivative returns d ln(N) / d k^2 = k^2/N dN/dk^2
+        return interp.Derivative(std::log(ktsqr));
         res = interp.Derivative(std::log(ktsqr))
             * std::exp(interp.Evaluate(std::log(ktsqr))) / ktsqr;
     }
@@ -292,16 +293,19 @@ REAL Amplitude::LogLogDerivative(REAL ktsqr, REAL rapidity)
         return 0;
     }
 
-    bool bspline=false;
+    /*bool bspline=true;
     SetInterpolationPoints(20);
+    return N(ktsqr, rapidity, bspline, true);
     return ktsqr/N(ktsqr, rapidity, bspline)*N(ktsqr, rapidity, bspline, true);
-    
+    */
 
     // f'(x) \approx [ f(x+h) - f(x-h) ] / 2h + o(h^2)
     SetInterpolationPoints(INTERPOLATION_POINTS_DER);
-    REAL lnktsqr1 = std::log(ktsqrvals[ktsqrind]);
+
+    // h=lnktsqr[ind+1]-lnktsqr[ind] = lnktsqr[ind] - lnktsqr[ind-1]
+    REAL lnktsqr1 = std::log(ktsqrvals[ktsqrind-1]);
     REAL lnktsqr2 = std::log(ktsqrvals[ktsqrind+1]);
-    REAL n1 = std::log(N(ktsqrvals[ktsqrind], rapidity, true) );
+    REAL n1 = std::log(N(ktsqrvals[ktsqrind-1], rapidity, true) );
     REAL n2 = std::log(N(ktsqrvals[ktsqrind+1], rapidity, true) );
     REAL h = lnktsqr2 - lnktsqr1;
     REAL der = (n2-n1)/h;
@@ -386,7 +390,7 @@ REAL Amplitude::SaturationScale(REAL y)
     Sathelper helper;
     helper.y=y; helper.N=this;
     helper.gammac = 0.6275;
-    //helper.gammac = 0.5;
+    helper.gammac = 0.5;
     
     gsl_function f; f.function=&SaturationHelperf;
     f.params=&helper;
