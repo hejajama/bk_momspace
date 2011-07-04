@@ -20,10 +20,10 @@ int Interpolator::Initialize()
     switch(method)
     {
         case INTERPOLATE_SPLINE:
-                acc = gsl_interp_accel_alloc();
-                spline = gsl_spline_alloc(gsl_interp_cspline, points);
-                gsl_spline_init(spline, xdata, ydata, points);
-                break;
+            acc = gsl_interp_accel_alloc();
+            spline = gsl_spline_alloc(gsl_interp_cspline, points);
+            gsl_spline_init(spline, xdata, ydata, points);
+            break;
         case INTERPOLATE_BSPLINE:
             gsl_vector *x = gsl_vector_alloc(points);
             gsl_vector *y = gsl_vector_alloc(points);
@@ -35,12 +35,10 @@ int Interpolator::Initialize()
                 gsl_vector_set(y, i, ydata[i]);
                 gsl_vector_set(w, i, 1.0);
             }
-    
-            const int ncoeffs = 12;
-            const int nbreak = ncoeffs-2; // k=4
      
             /* allocate a cubic bspline workspace (k = 4) */
-            bw = gsl_bspline_alloc(4, nbreak);
+            bw = gsl_bspline_alloc(k, nbreak);
+            derbw = gsl_bspline_deriv_alloc(k);
             B = gsl_vector_alloc(ncoeffs);
        
             X = gsl_matrix_alloc(points, ncoeffs);
@@ -126,7 +124,15 @@ REAL Interpolator::Derivative(REAL x)
             status = gsl_spline_eval_deriv_e(spline, x, acc, &res);
             break;
         case INTERPOLATE_BSPLINE:
-            res=0;
+            gsl_matrix* mat = gsl_matrix_alloc(nbreak+k-2, 2);
+            gsl_bspline_deriv_eval(x, 1, mat, bw, derbw);
+            for (int i=0; i<ncoeffs; i++)
+            {
+                res += gsl_vector_get(c, i)*gsl_matrix_get(mat, i, 1);
+            }
+            gsl_matrix_free(mat);
+            return res;
+            
     }
 
     return res;
@@ -158,6 +164,7 @@ Interpolator::~Interpolator()
             break;
         case INTERPOLATE_BSPLINE:
             gsl_bspline_free(bw);
+            gsl_bspline_deriv_free(derbw);
             gsl_vector_free(B);
             gsl_matrix_free(X);
             gsl_vector_free(c);

@@ -259,7 +259,10 @@ int main(int argc, char* argv[])
             else if (string(argv[i+1])=="CHEBYSHEV")
                 method = CHEBYSHEV_SERIES;
             else
+            {
                 cerr << "Mode " << argv[i+1] << " is not valid!" << endl;
+                return -1;
+            }
 
 
         }
@@ -570,7 +573,7 @@ void SinglePlotR()
 void SaturationScale()
 {
     cout << "# Saturation scale Q_s as a function of y" << endl;
-    cout << "# y  Bspline-Q_s Q_s N(Q_s)=" << SATSCALE_N << endl;
+    cout << "# y  Bspline-Q_s Q_s N(Q_s)= bsplineder splineder" << SATSCALE_N << endl;
 
     // Bspline interpolation
     int points = static_cast<int>(maxy/0.1);
@@ -613,7 +616,8 @@ void SaturationScale()
         REAL tmpy = 0.1*i;
         cout << std::scientific << std::setprecision(15) << tmpy << " "
             << inter.Evaluate(tmpy) << " " << N->SaturationScale(tmpy)
-            << " " << N->SolveKtsqr(tmpy, SATSCALE_N) << endl;
+            << " " << N->SolveKtsqr(tmpy, SATSCALE_N)
+            << endl;
 
         delete[] yarray;
         delete[] qsarray;

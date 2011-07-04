@@ -59,7 +59,7 @@ class Amplitude
         // to compute the amplitude (e.g. ChebyshevAmplitudeSolver), and
         // in that case they may not use n[][]-table or AddDataPoint-routines
         // at all!
-        virtual REAL N(REAL ktsqr, REAL y, bool bspline=false);
+        virtual REAL N(REAL ktsqr, REAL y, bool bspline=false, bool derivative=false);
         void IntializeBSpline(int ktsqrind, REAL rapidity);
 
         REAL SaturationScale(REAL y);

@@ -90,11 +90,14 @@ void Amplitude::Initialize()
  * Compute amplitude from the tabulated values
  */
 
-REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline)
+REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
 {
     
-    if (y<eps and datafile==false) return InitialCondition(ktsqr);
+    if (y<eps and datafile==false and derivative==false) return InitialCondition(ktsqr);
     if (y<eps) y=0;
+    if (ktsqr>MaxKtsqr() and derivative==false) return 0;
+    if (ktsqr>MaxKtsqr() and derivative) ktsqr=MaxKtsqr();
+    if (ktsqr < MinKtsqr()) ktsqr=MinKtsqr();
     
     // Find ktsqrval and yval indexes refer to index for which
     // val[index]  is smaller than (or equal) y/ktsqr
@@ -116,30 +119,26 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline)
                 << " y=" << yvals[yind] << ". " << LINEINFO << endl;
     }
 
-    if (ktsqrind < 0) // Didn't find, so refers to the largest one 
+    if (!derivative)
     {
-        ktsqrind=ktsqrvals.size()-1;
-        if (ktsqr - ktsqrvals[ktsqrvals.size()-1] > 100)
-            cerr << "Asked amplitude at too large ktsqr=" << ktsqr << ", falling back to "
-                << " ktsqr=" << ktsqrvals[ktsqrind] << ". " << LINEINFO << endl;
-    }
 
-    if (std::abs(ktsqr - ktsqrvals[0])/ktsqrvals[0] < 0.001)    // Don't interpolate in kt
-    {
-        if (yind == yvals.size()-1) return n[0][yind];
-        return n[0][yind]+(y-yvals[yind])*(n[0][yind+1]-n[0][yind])
-            / ( yvals[yind+1] - yvals[yind] );
-    }
+        if (std::abs(ktsqr - ktsqrvals[0])/ktsqrvals[0] < 0.001)    // Don't interpolate in kt
+        {
+            if (yind == yvals.size()-1) return n[0][yind];
+            return n[0][yind]+(y-yvals[yind])*(n[0][yind+1]-n[0][yind])
+                / ( yvals[yind+1] - yvals[yind] );
+        }
 
-    if (std::abs(ktsqr - ktsqrvals[ktsqrvals.size()-1])/ktsqrvals[ktsqrvals.size()-1]
-        < 0.001)
-    {
-        if (yind == yvals.size()-1) return n[n.size()-1][yind];
-        return n[n.size()-1][yind]+(y-yvals[yind])
-            *(n[n.size()-1][yind+1]-n[n.size()-1][yind])
-            / ( yvals[yind+1] - yvals[yind] );
+        if (std::abs(ktsqr - ktsqrvals[ktsqrvals.size()-1])/ktsqrvals[ktsqrvals.size()-1]
+            < 0.001)
+        {
+            if (yind == yvals.size()-1) return n[n.size()-1][yind];
+            return n[n.size()-1][yind]+(y-yvals[yind])
+                *(n[n.size()-1][yind+1]-n[n.size()-1][yind])
+                / ( yvals[yind+1] - yvals[yind] );
+        }
     }
-
+    
     // Keep y fixed, interpolate ktsqr
     // Interpolate only INTERPOLATION_POINTS points in order to make this
     // almost fast
@@ -151,16 +150,22 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline)
 		interpolation_start=0;
 		interpolation_end=interpolation_points;
 	}
-	else if (ktsqrind + interpolation_points/2 > KtsqrPoints()-1 )
+	else if (ktsqrind + interpolation_points/2 > KtsqrPoints()-2 )
 	{
 		interpolation_end = KtsqrPoints();
-		interpolation_start = KtsqrPoints()-interpolation_points-2;
+		interpolation_start = KtsqrPoints()-interpolation_points-3;
 	}
 	else
 	{
 		interpolation_start = ktsqrind - interpolation_points/2;
 		interpolation_end = ktsqrind + interpolation_points/2;
 	}
+
+    // First data point is sometimes somehow off, so don't use bspline
+    // with that
+    ///TODO: Why?
+    if (interpolation_start==0) { bspline=false; }
+    
 	int interpo_points = interpolation_end - interpolation_start+1;
     
     REAL *tmparray = new REAL[interpo_points];
@@ -180,15 +185,31 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline)
                  + (y - yvals[yind]) * (n[i][yind+1] - n[i][yind]) / (yvals[yind+1]-yvals[yind]);
             }
 		} 
-		
-			
     }
+
+    // xarray => lnxarray, yarray => lnyarray
+    ///TODO: Tabulate ln on amplitude
+    for (int i=0; i<interpo_points; i++)
+    {
+        tmpxarray[i] = std::log(tmpxarray[i]);
+        if (std::abs(tmparray[i]) < 1e-50) tmparray[i]=-9999999;
+        else tmparray[i] = std::log(tmparray[i]);
+    }
+        
 
     Interpolator interp(tmpxarray, tmparray, interpo_points);
     if (bspline)
         interp.SetMethod(INTERPOLATE_BSPLINE);
     interp.Initialize();
-    REAL res = interp.Evaluate(ktsqr);
+    REAL res;
+    if (derivative)
+    {
+        // Derivative returns d ln(N) / d k^2 = k^2/N dN/dk^2
+        res = interp.Derivative(std::log(ktsqr))
+            * std::exp(interp.Evaluate(std::log(ktsqr))) / ktsqr;
+    }
+    else
+        res = std::exp(interp.Evaluate(std::log(ktsqr)));
 
     delete[] tmparray;
     delete[] tmpxarray;
@@ -244,7 +265,8 @@ void Amplitude::AddDataPoint(int ktsqrindex, int yindex, REAL value, REAL der)
 
 /*
  * d ln N(ktsqr) / d ln(ktsqr) = d ktsqr / d ln Ktsqr d ln N(ktsqr) /d ktsqr
- * = ktsqr d ln N(ktsqr) / d ksqr = ktsqr/eps ln [ N(ktsqr + eps) / N(ktsqr) ]
+ * = ktsqr d ln N(ktsqr) / d ktsqr = ktsqr/N * dN/dktsqr
+ * =  ktsqr/eps ln [ N(ktsqr + eps) / N(ktsqr) ]
  */
 struct Derivhelper_loglog
 {
@@ -269,6 +291,11 @@ REAL Amplitude::LogLogDerivative(REAL ktsqr, REAL rapidity)
                 << LINEINFO << endl;
         return 0;
     }
+
+    bool bspline=false;
+    SetInterpolationPoints(20);
+    return ktsqr/N(ktsqr, rapidity, bspline)*N(ktsqr, rapidity, bspline, true);
+    
 
     // f'(x) \approx [ f(x+h) - f(x-h) ] / 2h + o(h^2)
     SetInterpolationPoints(INTERPOLATION_POINTS_DER);
@@ -396,6 +423,7 @@ REAL Amplitude::SaturationScale(REAL y)
         pos = gsl_min_fminimizer_x_minimum(s);
         interval_min = gsl_min_fminimizer_x_lower (s);
         interval_max = gsl_min_fminimizer_x_upper (s);
+        ///TODO: relerror/abserror from ktsqrval difference
         status = gsl_min_test_interval (interval_min, interval_max, 0.0, 0.01);
         
     } while (status == GSL_CONTINUE and iter < max_iter);

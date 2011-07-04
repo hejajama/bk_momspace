@@ -48,11 +48,16 @@ class Interpolator
 
         // bspline
         gsl_bspline_workspace *bw;
+        gsl_bspline_deriv_workspace *derbw;
         gsl_vector *B;
         gsl_vector *c;
         gsl_matrix *X;
         gsl_matrix *cov;
         gsl_multifit_linear_workspace *mw;
+
+        static const int k=4;
+        static const int ncoeffs = 12;
+        static const int nbreak = ncoeffs-k+2;
 
 
 };
