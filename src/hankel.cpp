@@ -24,16 +24,27 @@ struct Inthelper_hankel
 REAL Inthelperf_hankel(REAL k, void* p)
 {
     Inthelper_hankel* par = (Inthelper_hankel*)p;
-    return k*gsl_sf_bessel_j0(k* par->r) * par->N->N(SQR(k), par->y, true);
+    return k*gsl_sf_bessel_j0(k* par->r) * par->N->N(SQR(k), par->y, false);
 }
 
 void Hankel::PrintRAmplitude()
 {
     cout << "# r  N" << endl;
+/*
+    for (int i=0; i<points; i++)
+    {
+        REAL tmpr = gsl_dht_k_sample(dht, i);
+        cout << tmpr << " " << SQR(tmpr)*transformed[i] << endl;
+
+    }
+    return;
+    */
+    
 
     REAL minr = 1e-6; REAL maxr=1e1;
     REAL mult = std::pow(maxr/minr, 1.0/((REAL)points) );
 
+    #pragma omp parallel for
     for (int i=0; i<points; i++)
     {
         REAL r = minr*std::pow(mult, i);
@@ -75,17 +86,18 @@ Hankel::Hankel(Amplitude* amp, REAL y_, int npoints)
     
     sample = new REAL[points];
     transformed = new REAL[points];
-    /*
-    dht = gsl_dht_new(points, 0, N->Ktsqrval(N->KtsqrPoints()-2) );
+/*
+    REAL maxk = std::sqrt( N->KtsqrPoints()-2 );
+    dht = gsl_dht_new(points, 0, maxk );
     
     for (int i=0; i<points; i++)
     {
-        REAL tmpktsqr = gsl_dht_x_sample(dht, i);
-        sample[i]=N->N(tmpktsqr, y);
+        REAL tmpkt = gsl_dht_x_sample(dht, i);
+        sample[i]=N->N(SQR(tmpkt), y);
     }
 
     gsl_dht_apply( dht, sample, transformed );
-    */
+*/    
 }
 
 Hankel::~Hankel()

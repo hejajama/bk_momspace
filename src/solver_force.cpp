@@ -181,10 +181,14 @@ REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y, const REAL* array)
         abserr << " relerror: " << abserr/result << endl;
 
     // Nonlinear term
-    result -= SQR(N(ktsqr, y));
+    // if rc is {MIN,MAX}k, then result is already multiplied by alpha_s
+    if (RunningCoupling()==MAXK or RunningCoupling() == MINK)
+        result -= SQR(N(ktsqr, y))*Alphabar_s(ktsqr);
+    else
+        result -= SQR(N(ktsqr, y));
 
     if (RunningCoupling()==CONSTANT)
-        result*=0.2;
+        result*=ALPHAS;
     if (RunningCoupling()==PARENT_DIPOLE)
         result *= Alphabar_s(ktsqr);
     
@@ -278,7 +282,8 @@ void BruteForceSolver::Solve(REAL maxy)
                     << h << endl;
             for (int ktsqrind = 0; ktsqrind < KtsqrPoints(); ktsqrind++)
             {
-                n[ktsqrind][yind] = amplitude[ktsqrind];
+                AddDataPoint(ktsqrind, yind, amplitude[ktsqrind], 0.0);
+                //n[ktsqrind][yind] = amplitude[ktsqrind];
             }
             continue;
         }

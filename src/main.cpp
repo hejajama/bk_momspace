@@ -562,7 +562,7 @@ REAL Inthelperf_ft(REAL ktqr, void* p)
 void SinglePlotR()
 {
     cout << "# y=" << y << ", ic=" << N->InitialConditionStr() << endl;
-    Hankel transformed(N, y, 100);
+    Hankel transformed(N, y, 300);
     transformed.PrintRAmplitude();
 
 }

@@ -38,10 +38,13 @@ void ErrHandler(const char * reason,
     
     // Errors related to convergence of integrals are handled when
     // gsl_integration functions are called, don't do anything with them here
-     // 14 = failed to reach tolerance
-     // 18 = roundoff error prevents tolerance from being achieved
+    // 14 = failed to reach tolerance
+    // 18 = roundoff error prevents tolerance from being achieved
     if (gsl_errno == 14 or gsl_errno == 18)
         return;
+
+    // 15 in expint.c:363: gsl_sf_gamma_inc underflows
+    if (gsl_errno == 15 and string(file)=="expint.c" and line==363) return;
 
     errors++;
     std::cerr << file << ":"<< line <<": Error " << errors << ": " <<reason

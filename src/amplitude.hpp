@@ -30,6 +30,8 @@ const int KTSQRINTITERATIONS = 3000; //1000; //12000;
 const int INTERPOLATION_POINTS = 20;
 const int INTERPOLATION_POINTS_DER=50;  // 50 good if 2000 ktsqrpoints, 100 for 5000
 
+const REAL Q0SQR = 0.24;    // GeV^2 arXiv:0902.1112
+
 enum INITIAL_CONDITION
 {
     FTIPSAT,    // \int d^2r 1/(2\pi r^2) exp(ik.r) 2(1-exp(-r^2))

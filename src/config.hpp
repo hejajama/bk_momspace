@@ -25,10 +25,11 @@ const int Nc=3;
 
 // Reqularization of the running coupling
 const REAL MAXALPHA = 0.3;  // Berger&Stasto 1010.0671
+const REAL ALPHAS = 0.2;       // \alpha_s if RC=constant
 
 // Other constants
 
-const REAL eps=0.000001; // Epsilon for runge kutta
+const REAL eps=0.000001;
 
 // Inline functions
 

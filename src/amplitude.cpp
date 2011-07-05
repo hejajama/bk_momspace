@@ -7,6 +7,7 @@
 #include "datafile.hpp"
 //#include <bci.h>
 #include <vector>
+#include <sstream>
 #include <gsl/gsl_sf_gamma.h>
 #include <gsl/gsl_integration.h>
 #include <gsl/gsl_sf_bessel.h>
@@ -510,14 +511,27 @@ REAL Amplitude::SolveKtsqr(REAL y, REAL amp)
 
 REAL Amplitude::InitialCondition(REAL ktsqr)
 {
+    int status;
     switch(ic)
     {
         case INVPOWER:    
             return pow(ktsqr+1, -1);    // BK in Full Momentum Space, hep-ph/0504080
             break;
         case FTIPSAT:
-            if (ktsqr > 2500) return 0.0;
-            return gsl_sf_gamma_inc(0.0,ktsqr/4.0); // Ft of 2(1-exp(-r^2))
+            // Ft of 1-exp(-r^2*Q_s0^2 / 4) = 1/2*Gamma[0, k^2/Q_s0^2]
+            // Fitted to HERA data in arXiv:0902.1112: Q_s0^2 = 0.24GeV^2
+            // Q_s0^2 defined in amplitude.hpp
+            // NB: In ref. \alpha(s) depends on log(4C^2/r^2lambdaqcd^2), but
+            // tools.cpp:Alpha_s depends on log(Q^2/lambdaqcd^2). Fitted value
+            // for C^2 is 5.3
+            
+            gsl_sf_result res;
+            status = gsl_sf_gamma_inc_e(0.0, ktsqr/Q0SQR, &res);
+            if (status==15) return 0.0; // Overflow
+            if (status)
+                cerr << "gsl_sf_gamma_inc_e failed at " << LINEINFO << " with "
+                    << "code " << status << " res " << 0.5*res.val << endl;
+            return 0.5*res.val;
             break;
         case INVPOWER4:
             return pow(SQR(ktsqr)+1, -1);
@@ -543,13 +557,16 @@ string Amplitude::InitialConditionStr()
 	{
 		return "Data is read from a file, don't know what initial condition was used";
 	}
+    std::stringstream s;
     switch (ic)
     {
         case INVPOWER:
             return "(kt^2 + 1)^(-1), BK in full momentum space, hep-ph/0504080";
             break;
         case FTIPSAT:
-            return "Gamma[0, kt^2/4], FT of 2(1-exp(-r^2))";
+            s << "0.5*Gamma[0, kt^2/Q_s0^2], FT of 1-exp(-r^2 Q_s0^2/4),"
+                << " Q_s0^2 = " << Q0SQR << " GeV^2";
+            return s.str();
             break;
         case INVPOWER4:
             return "(kt^4+1)^(-1), arbitrary";
