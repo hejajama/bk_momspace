@@ -21,10 +21,19 @@ struct Inthelper_hankel
     REAL y;
 };
 
-REAL Inthelperf_hankel(REAL k, void* p)
+/* Integrate \int d^2k/(2\pi) exp(-ik.r) N(k)
+ * = \int dk k J_0(k*r) N(k)
+ * = \int du exp(2*u) J_0[ exp(u)*r ]*N[ exp(u) ],
+ * k=exp(u)
+ */ 
+REAL Inthelperf_hankel(REAL u, void* p)
 {
     Inthelper_hankel* par = (Inthelper_hankel*)p;
-    return k*gsl_sf_bessel_j0(k* par->r) * par->N->N(SQR(k), par->y, false);
+    //REAL result = k*gsl_sf_bessel_J0(k* par->r) * par->N->N(SQR(k), par->y, false);
+    REAL result = std::exp(2.0*u)*gsl_sf_bessel_J0(exp(u)*par->r)
+        * par->N->N(std::exp(2.0*u), par->y, false);
+    //cout << u << " " << std::exp(2.0*u) << " " << result << endl;
+    return result;
 }
 
 void Hankel::PrintRAmplitude()
@@ -41,11 +50,11 @@ void Hankel::PrintRAmplitude()
     */
     
 
-    REAL minr = 1e-6; REAL maxr=1e1;
+    REAL minr = 5e-3; REAL maxr=1e3;
     REAL mult = std::pow(maxr/minr, 1.0/((REAL)points) );
 
     #pragma omp parallel for
-    for (int i=0; i<points; i++)
+    for (int i=0; i< points ; i++)
     {
         REAL r = minr*std::pow(mult, i);
         REAL result, abserr;
@@ -56,20 +65,25 @@ void Hankel::PrintRAmplitude()
         int_helper.function=&Inthelperf_hankel;
         int_helper.params=&par;
 
-        gsl_integration_cquad_workspace *workspace 
-            = gsl_integration_cquad_workspace_alloc(1000);
-        int status = gsl_integration_cquad(&int_helper, std::sqrt(N->Ktsqrval(0)),
-            std::sqrt(N->Ktsqrval(N->KtsqrPoints()-2)), 0,
-            0.02, workspace, &result, &abserr, NULL);
-        gsl_integration_cquad_workspace_free(workspace);
+        const size_t maxiter = 300000;
+
+        gsl_integration_workspace *workspace 
+            = gsl_integration_workspace_alloc(maxiter);
+        REAL minlnk = std::log(std::sqrt(N->Ktsqrval(0)));
+        REAL maxlnk = std::log(std::sqrt(N->Ktsqrval(N->KtsqrPoints()-1)));
+        int status = gsl_integration_qag(&int_helper, minlnk,
+            maxlnk, 0, 0.02, maxiter, GSL_INTEG_GAUSS21, workspace,
+            &result, &abserr);
+        gsl_integration_workspace_free(workspace);
 
         if (status)
         {
             cerr << "Hankel transformation integral failed at " << LINEINFO <<
-                ", r=" << r << ", y=" << y << endl;
+                ", r=" << r << ", result " << result << " relerr "
+                << std::abs(abserr/result) << " y=" << y << endl;
         }
         
-        cout << r << " " << SQR(r)*result << endl;
+        cout << r << " " << SQR(r)*result << " " << result << endl;
     }
 }
 

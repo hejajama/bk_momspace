@@ -114,10 +114,11 @@ class Amplitude
 
         REAL BSplineDerivative(REAL ktsqr, REAL* ktsqrarray, REAL* narray, uint points);
     
-        // n[ktsqr][y]
+        // n[ktsqrind][y]
         std::vector< std::vector<REAL> > n;
 
         std::vector<REAL> ktsqrvals;
+        std::vector<REAL> lnktsqrvals;
         std::vector<REAL> yvals;
 
         // derivatives

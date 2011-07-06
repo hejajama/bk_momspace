@@ -102,13 +102,12 @@ void SaturationScale();
 
 int main(int argc, char* argv[])
 {    
-    // Print the cmdline args
+    // Add cmdline args to infostr
     std::stringstream cmdline;
     cmdline << "# ";
     for (int i=0; i<argc; i++)
         cmdline << argv[i] << " " ;
     cmdline << endl;
-    cout << cmdline.str();
 
     gsl_set_error_handler(&ErrHandler);
 
@@ -562,7 +561,7 @@ REAL Inthelperf_ft(REAL ktqr, void* p)
 void SinglePlotR()
 {
     cout << "# y=" << y << ", ic=" << N->InitialConditionStr() << endl;
-    Hankel transformed(N, y, 300);
+    Hankel transformed(N, y, 60);
     transformed.PrintRAmplitude();
 
 }

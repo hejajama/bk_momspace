@@ -48,6 +48,7 @@ Amplitude::Amplitude()
 void Amplitude::Clear()
 {
 	ktsqrvals.clear();
+    lnktsqrvals.clear();
 	yvals.clear();
 
     for (unsigned int i=0; i<n.size(); i++)
@@ -65,7 +66,10 @@ void Amplitude::Initialize()
 {
 	Clear();
     for (unsigned int i=0; i<=KtsqrPoints(); i++)
+    {
         ktsqrvals.push_back(minktsqr * std::pow(ktsqr_multiplier, (int)i) );
+        lnktsqrvals.push_back(std::log(ktsqrvals[i]));
+    }
     for (unsigned int i=0; i<YPoints()+1; i++)
         yvals.push_back((REAL) i * delta_y);
     
@@ -190,13 +194,16 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
 
     // xarray => lnxarray, yarray => lnyarray
     ///TODO: Tabulate ln on amplitude
-    for (int i=0; i<interpo_points; i++)
+    // Currently done only when derivative is calculated for performance reasons
+    if (derivative)
     {
-        tmpxarray[i] = std::log(tmpxarray[i]);
-        if (std::abs(tmparray[i]) == 0) tmparray[i]=-9999999;
-        else tmparray[i] = std::log(tmparray[i]);
+        for (int i=0; i<interpo_points; i++)
+        {
+            tmpxarray[i] = std::log(tmpxarray[i]);
+            if (std::abs(tmparray[i]) == 0) tmparray[i]=-9999999;
+            else tmparray[i] = std::log(tmparray[i]);
+        }
     }
-        
 
     Interpolator interp(tmpxarray, tmparray, interpo_points);
     if (bspline)
@@ -213,6 +220,7 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
     else
         res = std::exp(interp.Evaluate(std::log(ktsqr)));
 
+    res = interp.Evaluate(ktsqr);
     delete[] tmparray;
     delete[] tmpxarray;
     return res;
