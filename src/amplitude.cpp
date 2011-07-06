@@ -218,7 +218,7 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
             * std::exp(interp.Evaluate(std::log(ktsqr))) / ktsqr;
     }
     else
-        res = std::exp(interp.Evaluate(std::log(ktsqr)));
+        res = interp.Evaluate(ktsqr);
 
     res = interp.Evaluate(ktsqr);
     delete[] tmparray;
