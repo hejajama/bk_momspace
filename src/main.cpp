@@ -14,6 +14,7 @@
 #include "chebyshev.hpp"
 #include "hankel.hpp"
 #include "interpolation.hpp"
+#include "spectrum.hpp"
 #include <gsl/gsl_errno.h>
 #include <cmath>
 #include <fstream>
@@ -40,7 +41,10 @@ enum MODE
     GENERATE_SINGLE_PLOT,   // Print amplitude at a given rapidity
     GENERATE_SINGLE_RPLOT,  // Print amplitude in r-space at a given rapidity
     LOGLOG_DERIVATIVE,   // Calculate d ln N(k^2) / d ln(k^2)
-    SATURATION_SCALE        // Calculate Q_s as a function of y up to maxy
+    SATURATION_SCALE,       // Calculate Q_s as a function of y up to maxy
+    PT_SPECTRUM,            // Print dN_{ch} / dyd^2p_T as a function of p_T
+    PSEUDOY_SPECTRUM,       // dN_{ch} / d\eta, pseudorapidity spectrum
+    UGD                     // Plot uninteg. gluon density as a function of k_T
 };
 
 enum METHOD
@@ -99,6 +103,9 @@ void SinglePlot();
 void SinglePlotR();     // FT to r-space
 void Clear();
 void SaturationScale();
+void ParticleSpectrum_pt();  //dN_ch / dyd2pt as a function of sqrt(s)
+void ParticleSpectrum_pseudoy();
+void UnintegratedGluonDistribution(); // Plot unintegrated gluon density as a function of k_T
 
 int main(int argc, char* argv[])
 {    
@@ -117,7 +124,7 @@ int main(int argc, char* argv[])
     {
         cout << "Usage: " << endl;
         cout << "-mode [MODE]: what to do, modes: GENERATE_DATA, GENERATE_PLOTS, SINGLE_PLOT, SINGLE_RPLOT, LOGLOG_DERIVATIVE " << endl;
-        cout << "              SATURATION_SCALE" << endl;
+        cout << "              SATURATION_SCALE PT_SPECTRUM PSEUDOY_SPECTRUM UGD" << endl;
         cout << "-method [METHOD]: what method is used to solve BK, methods: BRUTEFORCE[2], CHEBYSHEV" << endl;
         cout << "-output [prefix]: set output file prefix, filenames are prefix_y[rapidity].dat" << endl;
         cout << "-miny, -maxy: rapidity values to solve" << endl;
@@ -242,6 +249,12 @@ int main(int argc, char* argv[])
                 mode=GENERATE_SINGLE_RPLOT;
             else if (string(argv[i+1])=="SATURATION_SCALE")
                 mode = SATURATION_SCALE;
+            else if (string(argv[i+1])=="PT_SPECTRUM")
+                mode = PT_SPECTRUM;
+            else if (string(argv[i+1])=="PSEUDOY_SPECTRUM")
+                mode = PSEUDOY_SPECTRUM;
+            else if (string(argv[i+1])=="UGD")
+                mode = UGD;
             else
             {
                 cerr << "Unrecognized mode " << argv[i+1] << ", exiting..." << endl;
@@ -427,6 +440,12 @@ int main(int argc, char* argv[])
         SinglePlotR();
     else if (mode==SATURATION_SCALE)
         SaturationScale();
+    else if (mode==PT_SPECTRUM)
+        ParticleSpectrum_pt();
+    else if (mode==PSEUDOY_SPECTRUM)
+        ParticleSpectrum_pseudoy();
+    else if (mode == UGD)
+        UnintegratedGluonDistribution();
 
 
     Clear();
@@ -623,3 +642,53 @@ void SaturationScale()
     }
 }
 
+// dN_{ch} / dydp^2
+void ParticleSpectrum_pt()
+{
+    Spectrum spec(N);
+    REAL sqrts = 7000;
+    cout << "# dN_ch/dyd^2pt / dy, y=" << y << ", sqrt(s) = "
+        << sqrts << "  (not normalized!)" << endl;
+    cout << "# pt  dN_ch/dyd^2pt" << endl;
+    for (REAL pt=1; pt<6; pt += 0.1)
+    {
+        REAL dn = spec.dNch_dydpsqr(sqrts, y, SQR(pt));
+        // dN_{ch} / dy dp_t^2 = dN_{ch} / d_y d^2 p_T (up to a normalization)
+        cout << pt << " " << dn << endl;
+    }
+
+}
+
+// dN_{ch} / d\eta, \sim previous integrated over pt
+void ParticleSpectrum_pseudoy()
+{
+    Spectrum spec(N);
+    REAL sqrts = 5500;  // LHC: 5500  RHIC: 200
+    cout << "# dN_ch / d\\eta, sqrt(s) = " << sqrts << endl;
+    cout << "#\\eta  dN_ch/d\\eta" << endl;
+
+    const int niter = 50;
+    #pragma omp parallel for
+    for (int i=0; i<niter; i++)
+    {
+        REAL eta = static_cast<REAL>(i) / static_cast<REAL>(niter) * 10.0;
+        // Assume massless case, \eta = y
+        // Formula is explicitly symmetirc, so \pm y gives the same result
+        REAL y = eta; REAL result = spec.dNch_dy(sqrts, y);
+        cout << eta << " " << result << endl;
+        cout << -eta << " " << result << endl;
+    }
+}
+
+// Unintegrated gluon density as a function of k_T
+// So just amplitude in k-space, or (TODO)
+// k^2 \grad_k^2 N(k)
+void UnintegratedGluonDistribution()
+{
+    cout << "# Unintegrated gluon density, y=" << y << endl;    
+    cout << "# k_T    UGD" << endl;
+    for (REAL kt=1e-4; kt<1e2; kt*=1.2)
+    {
+        cout << kt << " " << N->N(SQR(kt), y) << endl;
+    }
+}

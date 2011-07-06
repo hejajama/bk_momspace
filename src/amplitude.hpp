@@ -30,7 +30,10 @@ const int KTSQRINTITERATIONS = 3000; //1000; //12000;
 const int INTERPOLATION_POINTS = 20;
 const int INTERPOLATION_POINTS_DER=50;  // 50 good if 2000 ktsqrpoints, 100 for 5000
 
-const REAL Q0SQR = 0.24;    // GeV^2 arXiv:0902.1112
+const REAL Q0SQR = 0.24/**std::pow(200, 1.0/3.0)*/;    // 0.24 GeV^2 arXiv:0902.1112
+                            // For AA: *A^(1/3), A=197 (gold)
+                            // Pb: ~208
+
 
 enum INITIAL_CONDITION
 {
@@ -109,6 +112,7 @@ class Amplitude
 
 
         REAL InitialCondition(REAL ktsqr);  // N() at y=0
+        REAL Y(REAL xbj);   // Y from xbj
         
     protected:
 
@@ -134,6 +138,8 @@ class Amplitude
         REAL ktsqr_multiplier;
         REAL maxy;
         REAL delta_y;
+
+        REAL x0;    // Set by IC
 
         RUNNING_COUPLING running_coupling;
 

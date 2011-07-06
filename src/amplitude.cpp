@@ -520,6 +520,7 @@ REAL Amplitude::SolveKtsqr(REAL y, REAL amp)
 REAL Amplitude::InitialCondition(REAL ktsqr)
 {
     int status;
+    x0=0.01;
     switch(ic)
     {
         case INVPOWER:    
@@ -744,6 +745,15 @@ RUNNING_COUPLING Amplitude::RunningCoupling()
 void Amplitude::SetInterpolationPoints(int p)
 {
     interpolation_points=p;
+}
+
+/*
+ * Return (effective) rapidity from xbj
+ * Depends on x_0 which is again determined by the initial condition
+ */
+REAL Amplitude::Y(REAL xbj)
+{
+    return std::log(x0/xbj);
 }
 
 /* Returns index i for which
