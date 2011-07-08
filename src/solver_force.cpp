@@ -116,8 +116,8 @@ REAL inthelperf_bkmom_constraint(REAL lnktsqr, void* p)
     REAL result=0;
     if (std::abs(lnktsqr - par->lnktsqr) < 1e-15)
     {
-        cerr << "ktsqr \\approx par->ktsqr and we can't handle this! y=" << par->y
-            << " par->ktsqr=" << parktsqr << " at " << LINEINFO << endl;
+        //cerr << "ktsqr \\approx par->ktsqr and we can't handle this! y=" << par->y
+        //    << " par->ktsqr=" << parktsqr << " at " << LINEINFO << endl;
             ///TODO
     }
     else
@@ -204,7 +204,7 @@ struct EvolutionHelper
 {
     BruteForceSolver* N;
 };
-int Evolve(REAL y, const REAL amplitude[], REAL result[], void *params)
+int Evolve(REAL y, const REAL amplitude[], REAL dydt[], void *params)
 {
     cout << "Evolving with y=" << y << endl;
     EvolutionHelper* helper = (EvolutionHelper*)params;
@@ -213,7 +213,7 @@ int Evolve(REAL y, const REAL amplitude[], REAL result[], void *params)
    // the volution is accurate 
    #pragma omp parallel for
    for( int i=0 ; i<helper->N->KtsqrPoints() ; i++) {
-      result[i] = helper->N->RapidityDerivative(helper->N->Ktsqrval(i), y, amplitude);
+      dydt[i] = helper->N->RapidityDerivative(helper->N->Ktsqrval(i), y, amplitude);
    }
    return GSL_SUCCESS;
 }

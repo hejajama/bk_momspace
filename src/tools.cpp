@@ -59,7 +59,7 @@ void ErrHandler(const char * reason,
  * Berger&Stasto 1010.0671 [hep-ph]
  * Reqularization is set in file config.hpp
  */
-REAL Alpha_s(REAL Qsqr)
+REAL Alpha_s(REAL Qsqr, REAL scaling)
 {
     if (Qsqr < LAMBDAQCD2)
         return MAXALPHA;
@@ -69,7 +69,14 @@ REAL Alpha_s(REAL Qsqr)
     return alpha;
 }
 
-REAL Alphabar_s(REAL Qsqr)
+REAL Alphabar_s(REAL Qsqr, REAL scaling)
 {
-    return Alpha_s(Qsqr)*Nc/M_PI;
+    return Alpha_s(Qsqr, scaling)*Nc/M_PI;
+}
+
+std::string Alpha_s_str()
+{
+    std::stringstream stream;
+    stream << "\\alpha_s is freezed at " << MAXALPHA;
+    return stream.str();
 }

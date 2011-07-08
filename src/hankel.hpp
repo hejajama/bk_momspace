@@ -13,12 +13,13 @@
 #include "config.hpp"
 #include "amplitude.hpp"
 #include <gsl/gsl_dht.h>
+#include <cmath>
 
 class Hankel
 {
     public:
-        Hankel(Amplitude *amp, REAL y_, int npoints);
-        void PrintRAmplitude();  // Print amplitude in position space
+        Hankel(Amplitude *amp);
+        REAL Amplitude_r(REAL r, REAL y);
         ~Hankel();
     private:
         int points;

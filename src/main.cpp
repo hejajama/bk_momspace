@@ -77,8 +77,9 @@ MODE mode=GENERATE_DATAFILE;
 bool kc=false;  // Kinematical constraint
 RUNNING_COUPLING running_coupling=CONSTANT;
 bool scale_sat=false;  // Scale k_T with the scaturation scale
+REAL sqrts = 7000;  // Center of mass energy
 
-METHOD method=CHEBYSHEV_SERIES;
+METHOD method=BRUTEFORCE;
 
 // Parameters for BruteForceSolver
 bool read_data=false;
@@ -139,6 +140,7 @@ int main(int argc, char* argv[])
         cout << "-data [datafile]: read data from datafiles from path datafile_y[rapdity].dat" << endl;
         cout << "  -maxdatay [yval]: set maximum y value for datafiles, -delta_datay [yval] difference of yvals for datafiles" << endl;
         cout << "-y [yval]: rapidity value for e.g. loglog derivative" << endl;
+        cout << "-sqrts [val]: value of sqrt(s) in GeV" << endl;
         cout << "-load_matrix [filename], -save_matrix [filename]: load/save coefficient matrix (CHEBYSHEV method)" << endl;
         cout << "-chebyshev_degree [number]: number of basis vectors" << endl;
         cout << "-minktsqr [val], -maxktsqr [val], -ktsqrpoints [val]" << endl;
@@ -205,6 +207,8 @@ int main(int argc, char* argv[])
             maxktsqr = StrToReal(argv[i+1]);
         else if (string(argv[i])=="-ktsqrpoints")
             ktsqrpoints = StrToInt(argv[i+1]);
+        else if (string(argv[i])=="-sqrts")
+            sqrts = StrToReal(argv[i+1]);
         else if (string(argv[i])=="-load_matrix")
         {
             cheb_matrix = LOAD;
@@ -319,7 +323,7 @@ int main(int argc, char* argv[])
     infostr << "# Kinematical constraint is ";
     if (kc) infostr << "applied"; else infostr << "not applied"; infostr << endl;
     infostr << "# Running coupling is " << N->RunningCouplingStr() << endl;
-
+    infostr << "# " << Alpha_s_str() << endl;
     infostr << "# Initial condition: " << N->InitialConditionStr() <<  endl;
     infostr << "# Grid size: ktsqrpoints x ypoints = " << N->KtsqrPoints() << " x " << N->YPoints()
         << " = " << N->KtsqrPoints()*N->YPoints() << endl;
@@ -558,7 +562,7 @@ void SinglePlot()
     cout << "# N(k_T)=" << SATSCALE_N << ", k_T:" << endl;
     cout << "###" << N->SolveKtsqr(y, SATSCALE_N) << endl;
     cout << "# ktsqr amplitude initial_condition bspline_amplitude" << endl;
-    ktsqr_mult = N->KtsqrMultiplier();
+    ktsqr_mult = std::pow(N->KtsqrMultiplier(),1.0/4.0);
 
     for (int i=0; i<N->KtsqrPoints()-1; i+=10)
     {
@@ -580,8 +584,15 @@ REAL Inthelperf_ft(REAL ktqr, void* p)
 void SinglePlotR()
 {
     cout << "# y=" << y << ", ic=" << N->InitialConditionStr() << endl;
-    Hankel transformed(N, y, 60);
-    transformed.PrintRAmplitude();
+    cout << "# r [GeV^(-1)]     N(r)" << endl;
+    Hankel transform(N);
+    REAL minr=1e-6; REAL maxr=5e2; int rpoints=80;
+    REAL mult = std::pow(maxr/minr, 1.0/static_cast<REAL>(rpoints));
+    for (int i=0; i<=rpoints; i++)
+    {
+        REAL tmpr = minr*std::pow(mult, i);
+        cout << tmpr << " " <<transform.Amplitude_r(tmpr, y) << endl;
+    }
 
 }
 
@@ -646,7 +657,6 @@ void SaturationScale()
 void ParticleSpectrum_pt()
 {
     Spectrum spec(N);
-    REAL sqrts = 7000;
     cout << "# dN_ch/dyd^2pt / dy, y=" << y << ", sqrt(s) = "
         << sqrts << "  (not normalized!)" << endl;
     cout << "# pt  dN_ch/dyd^2pt" << endl;
@@ -663,7 +673,6 @@ void ParticleSpectrum_pt()
 void ParticleSpectrum_pseudoy()
 {
     Spectrum spec(N);
-    REAL sqrts = 5500;  // LHC: 5500  RHIC: 200
     cout << "# dN_ch / d\\eta, sqrt(s) = " << sqrts << endl;
     cout << "#\\eta  dN_ch/d\\eta" << endl;
 
@@ -675,8 +684,11 @@ void ParticleSpectrum_pseudoy()
         // Assume massless case, \eta = y
         // Formula is explicitly symmetirc, so \pm y gives the same result
         REAL y = eta; REAL result = spec.dNch_dy(sqrts, y);
-        cout << eta << " " << result << endl;
-        cout << -eta << " " << result << endl;
+        #pragma omp critical
+        {
+            cout << eta << " " << result << endl;
+            cout << -eta << " " << result << endl;
+        }
     }
 }
 

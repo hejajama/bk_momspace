@@ -17,8 +17,10 @@ void ErrHandler(const char * reason,
                         int line,
                         int gsl_errno);
 
-REAL Alpha_s(REAL Qsqr);
-REAL Alphabar_s(REAL Qsqr); // \alpha_s N_C / Pi
+REAL Alpha_s(REAL Qsqr, REAL scaling=1.0);
+REAL Alphabar_s(REAL Qsqr, REAL scaling=1.0); // \alpha_s N_C / Pi
+
+std::string Alpha_s_str();
 
 #endif
 

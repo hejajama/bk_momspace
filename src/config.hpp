@@ -14,6 +14,7 @@ using std::cin;
 using std::endl;
 #include <string>
 using std::string;
+#include <cmath>
 
 typedef double REAL;
 typedef unsigned int uint;
@@ -22,6 +23,8 @@ typedef unsigned int uint;
 const REAL LAMBDAQCD2 = 0.21416*0.21416;   // GeV^2
 const int Nf=3;
 const int Nc=3;
+const REAL ALPHA_e = 1.0/137.035999679; 
+const REAL e = sqrt(4.0*M_PI*ALPHA_e);
 
 // Reqularization of the running coupling
 const REAL MAXALPHA = 0.3;  // Berger&Stasto 1010.0671

@@ -18,7 +18,7 @@ const unsigned int DEFAULT_MAXY=50;
 const REAL DEFAULT_KTSQR_MULTIPLIER = 1.01;  // ktsqr_{i+1} = ktsqr_i*KTSQR_MULTIPLIER
 //const REAL DEFAULT_KTSQR_MULTIPLIER = 1.05;
 const REAL DEFAULT_MINKTSQR = 1e-8; // orig: 1e-8
-const REAL DEFAULT_MAXKTSQR = 1e30;
+const REAL DEFAULT_MAXKTSQR = 1e40;
 
 const REAL SATSCALE_N = 0.05;
 
@@ -30,7 +30,7 @@ const int KTSQRINTITERATIONS = 3000; //1000; //12000;
 const int INTERPOLATION_POINTS = 20;
 const int INTERPOLATION_POINTS_DER=50;  // 50 good if 2000 ktsqrpoints, 100 for 5000
 
-const REAL Q0SQR = 0.24/**std::pow(200, 1.0/3.0)*/;    // 0.24 GeV^2 arXiv:0902.1112
+const REAL Q0SQR = 0.24; /*200; */    // 0.24 GeV^2 arXiv:0902.1112
                             // For AA: *A^(1/3), A=197 (gold)
                             // Pb: ~208
 
