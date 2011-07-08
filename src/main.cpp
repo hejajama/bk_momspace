@@ -312,6 +312,7 @@ int main(int argc, char* argv[])
         cerr << "There must be at least 3 ypoints to evaluate " << endl;
         return -1;
     }
+    N->SetDeltaY(delta_y);
     N->Initialize();
 
     ktsqrpoints = N->KtsqrPoints();
@@ -355,7 +356,6 @@ int main(int argc, char* argv[])
             }
             else
             {
-                N->SetDeltaY(delta_y);
                 N->Initialize();
                 if (adams)
                 {

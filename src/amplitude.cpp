@@ -157,7 +157,7 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
 	}
 	else if (ktsqrind + interpolation_points/2 > KtsqrPoints()-2 )
 	{
-		interpolation_end = KtsqrPoints()-1;
+		interpolation_end = KtsqrPoints();
 		interpolation_start = KtsqrPoints()-interpolation_points-3;
 	}
 	else

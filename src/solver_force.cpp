@@ -311,13 +311,13 @@ void BruteForceSolver::Solve(REAL maxy)
                 newn = adamsn;
             }
 
-               
-                
-            AddDataPoint(ktsqrind, yind, newn, tmpder );
-            if( abs(newn - n[ktsqrind][yind-1])/n[ktsqrind][yind-1] > 0.1)
+            if( abs(newn - n[ktsqrind][yind-1])/n[ktsqrind][yind-1] > 0.2)
             {
                 largedifference++;
             }
+                
+            AddDataPoint(ktsqrind, yind, newn, tmpder );
+
 
             /*if (ktsqrind % 100 == 0)
             {
