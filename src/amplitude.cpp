@@ -51,9 +51,9 @@ void Amplitude::Clear()
     lnktsqrvals.clear();
 	yvals.clear();
 
-    for (unsigned int i=0; i<n.size(); i++)
-        n[i].clear();
-    n.clear();
+    for (unsigned int i=0; i<ln_n.size(); i++)
+        ln_n[i].clear();
+    ln_n.clear();
     derivatives.clear();
  
 }
@@ -65,30 +65,24 @@ void Amplitude::Clear()
 void Amplitude::Initialize()
 {
 	Clear();
-    for (unsigned int i=0; i<=KtsqrPoints(); i++)
+    for (unsigned int i=0; i<KtsqrPoints(); i++)
     {
         ktsqrvals.push_back(minktsqr * std::pow(ktsqr_multiplier, (int)i) );
         lnktsqrvals.push_back(std::log(ktsqrvals[i]));
     }
-    for (unsigned int i=0; i<YPoints()+1; i++)
-        yvals.push_back((REAL) i * delta_y);
-    
-    for (unsigned int i=0; i<=KtsqrPoints(); i++)   // Intialize every kt
-    {
-        std::vector<REAL> tmpvec;
-        std::vector<REAL> tmpdervec;
 
-        // y=0 initial condition
-        tmpvec.push_back(InitialCondition( ktsqrvals[i] ));
+    yvals.push_back(0.0);
+
+    // Intialize ln_n at y=0
+    std::vector<REAL> tmpvec;
+    std::vector<REAL> tmpdervec;
+    for (uint i=0; i<KtsqrPoints(); i++)
+    {
+        tmpvec.push_back(std::log( InitialCondition( ktsqrvals[i] ) ) );
         tmpdervec.push_back(0.0);
-        for (unsigned int j=1; j<=YPoints(); j++)
-        {
-            tmpvec.push_back(0.0);
-            tmpdervec.push_back(0.0);
-        }
-        n.push_back(tmpvec);
-        derivatives.push_back(tmpdervec);
     }
+    ln_n.push_back(tmpvec);
+    derivatives.push_back(tmpdervec);
 }
 
 /*
@@ -101,8 +95,12 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
     if (y<eps and datafile==false and derivative==false) return InitialCondition(ktsqr);
     if (y<eps) y=0;
     if (ktsqr>MaxKtsqr() and derivative==false) return 0;
-    if (ktsqr>MaxKtsqr() and derivative) ktsqr=MaxKtsqr();
-    if (ktsqr < MinKtsqr()) ktsqr=MinKtsqr();
+    if (ktsqr>MaxKtsqr() and derivative) ktsqr=MaxKtsqr()*0.9999999;
+    if (ktsqr < MinKtsqr()) ktsqr=MinKtsqr()*1.00000001;
+    // Now we always have MinKtsqr() < ktsqr < MaxKtsqr() => interpolation works
+
+    if (ktsqr > MaxKtsqr() or ktsqr < MinKtsqr())
+        cerr << "Ktsqrval " << ktsqr << " is out of range! " << LINEINFO << endl;
     
     // Find ktsqrval and yval indexes refer to index for which
     // val[index]  is smaller than (or equal) y/ktsqr
@@ -123,27 +121,7 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
             cerr << "Asked amplitude at too large Y=" << y << ", falling back to "
                 << " y=" << yvals[yind] << ". " << LINEINFO << endl;
     }
-
-    if (!derivative)
-    {
-
-        if (std::abs(ktsqr - ktsqrvals[0])/ktsqrvals[0] < 0.001)    // Don't interpolate in kt
-        {
-            if (yind == yvals.size()-1) return n[0][yind];
-            return n[0][yind]+(y-yvals[yind])*(n[0][yind+1]-n[0][yind])
-                / ( yvals[yind+1] - yvals[yind] );
-        }
-
-        if (std::abs(ktsqr - ktsqrvals[ktsqrvals.size()-1])/ktsqrvals[ktsqrvals.size()-1]
-            < 0.001)
-        {
-            if (yind == yvals.size()-1) return n[n.size()-1][yind];
-            return n[n.size()-1][yind]+(y-yvals[yind])
-                *(n[n.size()-1][yind+1]-n[n.size()-1][yind])
-                / ( yvals[yind+1] - yvals[yind] );
-        }
-    }
-    
+        
     // Keep y fixed, interpolate ktsqr
     // Interpolate only INTERPOLATION_POINTS points in order to make this
     // almost fast
@@ -155,9 +133,9 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
 		interpolation_start=0;
 		interpolation_end=interpolation_points;
 	}
-	else if (ktsqrind + interpolation_points/2 > KtsqrPoints()-2 )
+	else if (ktsqrind + interpolation_points/2 > KtsqrPoints()-1 )
 	{
-		interpolation_end = KtsqrPoints();
+		interpolation_end = KtsqrPoints()-1;
 		interpolation_start = KtsqrPoints()-interpolation_points-3;
 	}
 	else
@@ -166,10 +144,12 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
 		interpolation_end = ktsqrind + interpolation_points/2;
 	}
 
-    // First data point is sometimes somehow off, so don't use bspline
+    // First data point is sometimes somehow off, so don't use spline
     // with that
     ///TODO: Why?
     if (ktsqrind>0 and interpolation_start==0) { interpolation_start=1; }
+
+    //cout << "interp range " << interpolation_start << " - " << interpolation_end << " index " << ktsqrind << endl;
     
 	int interpo_points = interpolation_end - interpolation_start+1;
     
@@ -177,34 +157,19 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
     REAL *tmpxarray = new REAL[interpo_points];
     for (int i=interpolation_start; i<= interpolation_end; i++)
     {
-		tmpxarray[i-interpolation_start]=ktsqrvals[i];
+		tmpxarray[i-interpolation_start]=lnktsqrvals[i];
 
-        tmparray[i-interpolation_start] = n[i][yind];
+        tmparray[i-interpolation_start] = ln_n[yind][i];
 
         // Interpolate in y if possible
 		if (yind < yvals.size()-1 )
         {
-            if (n[ktsqrind][yind+1]>0 and y-yvals[yind]>0.000001 )
-            {
-                tmparray[i-interpolation_start]=n[i][yind] 
-                 + (y - yvals[yind]) * (n[i][yind+1] - n[i][yind]) / (yvals[yind+1]-yvals[yind]);
-            }
+            tmparray[i-interpolation_start]=ln_n[yind][i] 
+                + (y - yvals[yind]) * (ln_n[yind+1][i] - ln_n[yind][i])
+                / (yvals[yind+1]-yvals[yind]);
 		} 
     }
-
-    // xarray => lnxarray, yarray => lnyarray
-    ///TODO: Tabulate ln on amplitude
-    // Currently done only when derivative is calculated for performance reasons
-    if (derivative)
-    {
-        for (int i=0; i<interpo_points; i++)
-        {
-            tmpxarray[i] = std::log(tmpxarray[i]);
-            if (std::abs(tmparray[i]) == 0) tmparray[i]=-9999999;
-            else tmparray[i] = std::log(tmparray[i]);
-        }
-    }
-
+    
     Interpolator interp(tmpxarray, tmparray, interpo_points);
     if (bspline)
         interp.SetMethod(INTERPOLATE_BSPLINE);
@@ -212,15 +177,13 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
     REAL res;
     if (derivative)
     {
-        // Derivative returns d ln(N) / d k^2 = k^2/N dN/dk^2
-        return interp.Derivative(std::log(ktsqr));
+        // Derivative returns d ln(N) / d ln k^2 = k^2/N dN/dk^2
         res = interp.Derivative(std::log(ktsqr))
             * std::exp(interp.Evaluate(std::log(ktsqr))) / ktsqr;
     }
     else
-        res = interp.Evaluate(ktsqr);
+        res = std::exp( interp.Evaluate(std::log(ktsqr) ) );
 
-    res = interp.Evaluate(ktsqr);
     delete[] tmparray;
     delete[] tmpxarray;
     return res;
@@ -253,21 +216,16 @@ void Amplitude::AddDataPoint(int ktsqrindex, int yindex, REAL value, REAL der)
     // BK at Y=Y_0+DELTA_Y, we start at ktsqrindex=0 and move to ktsqrindex=max
     // keeping Y=Y_0+DELTA_Y, then start at ktsqrindex=0 and Y=Y_0+2DELTA_Y
 
-    if (ktsqrindex < 0 or yindex < 0 or ktsqrindex > n.size()-1
-        or yindex > n[ktsqrindex].size()-1)
+    if (ktsqrindex < 0 or yindex < 0 or ktsqrindex > ln_n[yindex].size()-1)
     {
         cerr << "Invalid ktsqr/y index " << ktsqrindex << " / " << yindex << ". "
             << LINEINFO << endl;
         return;
     }
-    /*if (n[ktsqrindex][yindex]>    REAL n1,n2;
-    
-        cerr << "Overwriting data, ktindex = " << ktsqrindex << ", yindex = "
-            << yindex << ". " << LINEINFO << endl; */
-    n[ktsqrindex][yindex]=value;
+    ln_n[yindex][ktsqrindex]=std::log(value);
 
     if (yindex>=1)
-        derivatives[ktsqrindex][yindex-1]=der;
+        derivatives[yindex-1][ktsqrindex]=der;
     else
         cerr << "Added data point with yindex=" << yindex << " " << LINEINFO << endl;
 }
@@ -615,11 +573,9 @@ int Amplitude::ReadData(string file)
 	SetMinKtsqr(f.MinKtsqr());
 	SetKtsqrMultiplier(f.KtsqrMultiplier());
 	SetMaxKtsqr(minktsqr*std::pow(KtsqrMultiplier(), f.KtsqrPoints()));
-	SetMaxY(f.MaxY());
-	SetDeltaY(f.DeltaY());
 	Initialize();
 
-	f.GetData(n);
+	f.GetData(ln_n, yvals);
 
 	datafile=true;
 	return 0;
@@ -682,7 +638,8 @@ void Amplitude::SetDeltaY(REAL dy)
 
 unsigned int Amplitude::YPoints()
 {
-    return static_cast<unsigned int>(maxy/delta_y)+1;
+    return yvals.size()-1;
+    //return static_cast<unsigned int>(maxy/delta_y)+1;
 }
 
 unsigned int Amplitude::KtsqrPoints()
@@ -707,7 +664,7 @@ REAL Amplitude::MinKtsqr()
 
 REAL Amplitude::MaxKtsqr()
 {
-    return maxktsqr;
+    return minktsqr*std::pow(ktsqr_multiplier, (int)KtsqrPoints());
 }
 
 bool Amplitude::KinematicalConstraint()
@@ -763,8 +720,8 @@ REAL Amplitude::Y(REAL xbj)
 int Amplitude::KtsqrIndex(REAL ktsqr)
 {
     int ktsqrind=-1;
-    if (ktsqr< MinKtsqr()*0.999999 or ktsqr > MaxKtsqr()*1.000001) return -1;
-    for (unsigned int i=0; i<ktsqrvals.size()-1; i++)
+    if (ktsqr< MinKtsqr() or ktsqr > MaxKtsqr()) return -1;
+    for (unsigned int i=0; i<KtsqrPoints()-1; i++)
     {
         if (ktsqrvals[i]<=ktsqr and ktsqrvals[i+1]>ktsqr)
         {
@@ -772,5 +729,32 @@ int Amplitude::KtsqrIndex(REAL ktsqr)
             break;
         }
     }
+    if (ktsqrind==-1) return KtsqrPoints()-1;
     return ktsqrind;
+}
+
+/*
+ * Add new rapidity value for tables
+ */
+void Amplitude::AddRapidity(REAL y)
+{
+    if (y <= yvals[yvals.size()-1])
+    {
+        cerr << "Trying to add rapidity value " << y << " but currently "
+        << "the largest rapidity tabulated is " << yvals[yvals.size()-1] << endl;
+        return;
+    }
+
+    yvals.push_back(y);
+
+    std::vector<REAL> tmpvec;
+    std::vector<REAL> tmpdervec;
+    for (uint i=0; i<KtsqrPoints(); i++)
+    {
+        tmpvec.push_back(-99999999999); // ln N = -\infty => N = 0
+        tmpdervec.push_back(0.0);
+    }
+    ln_n.push_back(tmpvec);
+    derivatives.push_back(tmpdervec);
+
 }

@@ -28,6 +28,7 @@ void ChebyshevSolver::Solve(REAL maxy)
 
     for (unsigned int yind=1; yind <= maxyind; yind++)
     {
+        AddRapidity(yvals[yind]);
         REAL tmpy = yvals[yind];
         cout << "Solving for y=" << tmpy << endl;
         REAL dy = yvals[yind]-yvals[yind-1];
@@ -175,7 +176,7 @@ void ChebyshevSolver::Prepare()
         uvals.push_back(std::cos(M_PI*(static_cast<REAL>(KtsqrPoints()-i))/(2.0*KtsqrPoints())));
       //  if (i < KtsqrPoints())
         ktsqrvals[i]=(std::exp( (-minl + maxl)*uvals[i]+minl ) );
-        n[i][0] = InitialCondition(ktsqrvals[i]);
+        ln_n[0][i] = std::log(InitialCondition(ktsqrvals[i]) );
     //    else
     //        ktsqrvals.push_back( exp( (-minl + maxl)*uvals[i]+minl ) );
     }

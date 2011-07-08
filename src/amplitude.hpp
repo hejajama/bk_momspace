@@ -117,15 +117,17 @@ class Amplitude
     protected:
 
         REAL BSplineDerivative(REAL ktsqr, REAL* ktsqrarray, REAL* narray, uint points);
-    
-        // n[ktsqrind][y]
-        std::vector< std::vector<REAL> > n;
+
+        void AddRapidity(REAL y);   // Add new rapidity
+            
+        // ln n [yind][ktsqrind] 
+        std::vector< std::vector<REAL> > ln_n;
 
         std::vector<REAL> ktsqrvals;
         std::vector<REAL> lnktsqrvals;
         std::vector<REAL> yvals;
 
-        // derivatives
+        // derivatives [yind][ktsqrind]
         std::vector< std::vector<REAL> > derivatives;
 
         INITIAL_CONDITION ic;

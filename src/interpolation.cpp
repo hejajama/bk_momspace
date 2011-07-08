@@ -113,6 +113,9 @@ REAL Interpolator::Evaluate(REAL x)
             return res;
             break;
     }
+
+    cerr << "Interpolation method is invalid! " << LINEINFO << endl;
+    return 0;   //Shoudn't end up here
 }
 
 REAL Interpolator::Derivative(REAL x)

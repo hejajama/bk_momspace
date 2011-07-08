@@ -7,7 +7,6 @@
 #include "config.hpp"
 #include "amplitude.hpp"
 #include "solver_force.hpp"
-#include "solver_force2.hpp"
 #include "solver_chebyshev.hpp"
 #include "chebyshev_amplitude.hpp"
 #include "tools.hpp"
@@ -126,7 +125,7 @@ int main(int argc, char* argv[])
         cout << "Usage: " << endl;
         cout << "-mode [MODE]: what to do, modes: GENERATE_DATA, GENERATE_PLOTS, SINGLE_PLOT, SINGLE_RPLOT, LOGLOG_DERIVATIVE " << endl;
         cout << "              SATURATION_SCALE PT_SPECTRUM PSEUDOY_SPECTRUM UGD" << endl;
-        cout << "-method [METHOD]: what method is used to solve BK, methods: BRUTEFORCE[2], CHEBYSHEV" << endl;
+        cout << "-method [METHOD]: what method is used to solve BK, methods: BRUTEFORCE, CHEBYSHEV" << endl;
         cout << "-output [prefix]: set output file prefix, filenames are prefix_y[rapidity].dat" << endl;
         cout << "-miny, -maxy: rapidity values to solve" << endl;
         //cout << "-minktsqr, -maxktsqr: range of k_T^2 to plot, doesn't affect to limits when solving BK" << endl;
@@ -295,7 +294,6 @@ int main(int argc, char* argv[])
      ***************************************/
 
     if (method==BRUTEFORCE) N = new BruteForceSolver;
-    else if (method == BRUTEFORCE2) N = new BruteForceSolver2;
     else if (method==CHEBYSHEV_SERIES) N = new ChebyshevAmplitudeSolver;
 
     N->SetInitialCondition(ic);
@@ -305,7 +303,7 @@ int main(int argc, char* argv[])
     N->SetMaxKtsqr(maxktsqr);
     N->SetMinKtsqr(minktsqr);
     N->SetKtsqrMultiplier( std::pow( maxktsqr/minktsqr,
-        1.0/static_cast<REAL>(ktsqrpoints) ) );
+        1.0/static_cast<REAL>(ktsqrpoints+1.0) ) );
     
     if (N->YPoints()<2 and method==BRUTEFORCE and mode==GENERATE_DATAFILE)
     {

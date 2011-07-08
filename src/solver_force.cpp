@@ -168,7 +168,7 @@ REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y, const REAL* array)
      = gsl_integration_workspace_alloc(ktsqriter);
 
     REAL minlnktsqr = std::log(ktsqrvals[0]);
-    REAL maxlnktsqr = std::log(ktsqrvals[ktsqrvals.size()-2]);
+    REAL maxlnktsqr = std::log( Ktsqrval(KtsqrPoints()-1) );
 
     int status;
     status=gsl_integration_qag(&int_helper, minlnktsqr,
@@ -222,15 +222,12 @@ int Evolve(REAL y, const REAL amplitude[], REAL dydt[], void *params)
 // Solve BK, lowest order
 void BruteForceSolver::Solve(REAL maxy)
 {
-    // Find maxyind corresponding to maxy
-    int maxyind=YPoints();
-    for (unsigned int i=1; i<=YPoints(); i++)
-    {
-        if (yvals[i]>maxy)
-            { maxyind=i; break; }
-    }
+
     int largedifference=0;
     int starty=1;
+    REAL Y=0;   // We are allways solved amplitude up to Y
+    int yind=0; // yvals[yind]=Y always
+    REAL nexty=delta_y;
 
     // **** used in GSL solver *****
     const gsl_odeiv2_step_type * T = gsl_odeiv2_step_rkf45;
@@ -240,31 +237,36 @@ void BruteForceSolver::Solve(REAL maxy)
     gsl_odeiv2_evolve * e  = gsl_odeiv2_evolve_alloc (KtsqrPoints());
     EvolutionHelper help; help.N=this;
     gsl_odeiv2_system sys = {Evolve, NULL, KtsqrPoints(), &help};
-    REAL Y=0;
     REAL Yi=0;
     REAL h = delta_y;   // Original step size
-    REAL *amplitude=new REAL[ktsqrvals.size()];
+    ///////
+
+    // these arrays are used to temporarily save solved amplitudes
+    REAL *amplitude=new REAL[KtsqrPoints()];
     for (int ktsqrind=0; ktsqrind < KtsqrPoints(); ktsqrind++)
     {
-        amplitude[ktsqrind] = n[ktsqrind][0];
+        amplitude[ktsqrind] = std::exp( ln_n[0][ktsqrind] );   // TODO: log?
     }
-    amplitude[ktsqrvals.size()-1]=0;
+
+    REAL *ders = new REAL[KtsqrPoints()];
 
     
     if (adams_method)
     {
-        InitializeAdamsMethod();
-        starty=2;
+        cerr << "Adams method is not working with new system... FIXME!" << endl;
+        exit(1);
+        //InitializeAdamsMethod();
+        //starty=2;
     }
     // ******************************
-    for (int yind=starty; yind<=maxyind; yind++)
+    do
     {
-        cout << "Solving for y=" << yvals[yind] << endl;
+        cout << "Solving for y=" << nexty << endl;
         // Solve N(y+DELTA_Y, kt) for every kt
 
         if (rungekutta)
         {
-            Yi = yvals[yind];
+            Yi = nexty;
             // gsl_odeiv_evolve_apply increases Y according to the step size
             // why gsl_odeiv_evolve_apply doesn't set Y=Y_i at the end?
             while (Y<Yi)
@@ -280,11 +282,15 @@ void BruteForceSolver::Solve(REAL maxy)
             } // end while (useless loop?)
             cout << "Solved yind " << yind << " to Y=" << Y << " with step size "
                     << h << endl;
+            AddRapidity(nexty); // During the evolution Y has evolved up to nexty  
             for (int ktsqrind = 0; ktsqrind < KtsqrPoints(); ktsqrind++)
             {
-                AddDataPoint(ktsqrind, yind, amplitude[ktsqrind], 0.0);
+                AddDataPoint(ktsqrind, yind+1, amplitude[ktsqrind], 0.0);
                 //n[ktsqrind][yind] = amplitude[ktsqrind];
             }
+
+            nexty += delta_y;
+            yind++;
             continue;
         }
         
@@ -294,48 +300,48 @@ void BruteForceSolver::Solve(REAL maxy)
         for (int ktsqrind=0; ktsqrind<KtsqrPoints(); ktsqrind++)
         {
             REAL tmpkt = ktsqrvals[ktsqrind];
-            REAL dy = yvals[yind]-yvals[yind-1];
-            REAL tmpder = RapidityDerivative(tmpkt, yvals[yind-1]);
-            REAL newn=n[ktsqrind][yind-1] + dy*tmpder;
+            REAL dy = nexty-yvals[yind];
+            REAL tmpder = RapidityDerivative(tmpkt, yvals[yind]);
+            REAL newn=std::exp(ln_n[yind][ktsqrind]) + dy*tmpder;
 
             // Adams method: apprximate derivative as a 2nd order polynomial
             // Y_{i+1} = y_i + hf_i + 1/2 h (f_i - f_{i-1} )
             // We can use this only for yind>1
             if (adams_method==true)
             {
-                REAL old_der = derivatives[ktsqrind][yind-2];
-                REAL adamsn = n[ktsqrind][yind-1] + dy*tmpder
+                REAL old_der = derivatives[yind-1][ktsqrind];
+                REAL adamsn = std::exp(ln_n[yind][ktsqrind] ) + dy*tmpder
                     + 1.0/2.0*dy*( tmpder - old_der);
 
                 //cout << "reldiff at k=" << ktsqrvals[ktsqrind] <<": " << std::abs((newn-adamsn)/newn) << endl;
                 newn = adamsn;
             }
 
-            if( abs(newn - n[ktsqrind][yind-1])/n[ktsqrind][yind-1] > 0.2)
+            if( abs(newn - std::exp(ln_n[yind][ktsqrind]) ) / std::exp(ln_n[yind][ktsqrind]) > 0.2)
             {
                 largedifference++;
             }
-                
-            AddDataPoint(ktsqrind, yind, newn, tmpder );
 
-
-            /*if (ktsqrind % 100 == 0)
-            {
-                cout << "y=" << yvals[yind] << ", ktsqr=" << ktsqrvals[ktsqrind]
-                    << " reldiff " << std::abs((newn-n[ktsqrind][yind-1])/n[ktsqrind][yind-1])
-                    << " absdiff " << std::abs(newn - n[ktsqrind][yind-1]) << endl;
-            }*/
-            //cout << "N(ktsqr=" << ktsqrvals[ktsqrind] <<", y=" << yvals[yind] << ") = " << newn
-            //<< ",  at lower rapidity it was " << n[ktsqrind][yind-1] << endl;
-                
+            amplitude[ktsqrind]=newn;
+            ders[ktsqrind] = tmpder;
         }
-    }
+
+        // Ok, solved for all k_T withour errors, save
+        AddRapidity(nexty);
+        for (uint i=0; i<KtsqrPoints(); i++)
+        {
+            AddDataPoint(i, yind+1, amplitude[i], ders[i] );
+        }
+        Y = nexty;
+        nexty += delta_y;
+        yind++;
+    }while(Y < maxy);
         
 
         
-    cout << endl << "#" << largedifference << " out of " << maxyind * (KtsqrPoints()-1)
-            << " too large differences" << endl;
+    cout << endl << "#" << largedifference << " too large differences" << endl;
     // Again
+    /*
     if (averages>0) cerr << "Averagements are not well tested..." << endl;
     for (int avg=0; avg<averages; avg++)
     {
@@ -368,12 +374,13 @@ void BruteForceSolver::Solve(REAL maxy)
         cout << endl << "#" << largedifference << " out of " << maxyind * (KtsqrPoints()-1)
             << " too large differences" << endl;
     } 
-    
+    */
 
     gsl_odeiv2_evolve_free(e);
     gsl_odeiv2_control_free(c);
     gsl_odeiv2_step_free(s);
     delete[] amplitude;
+    delete[] ders;
 }
 
 
@@ -385,6 +392,9 @@ void BruteForceSolver::Solve(REAL maxy)
  */
 void BruteForceSolver::InitializeAdamsMethod()
 {
+    cerr << "TODO at " << LINEINFO << ": adam's method is not impelmented with "
+    << "tabulated ln_n" << endl;
+    /*
     n.clear();
     REAL y = yvals[1];
     yvals.clear();
@@ -446,6 +456,7 @@ void BruteForceSolver::InitializeAdamsMethod()
         derivatives[i][0] = der_y0[i];
         n[i][1] = amp[i];
     }
+    */
     
 }
 

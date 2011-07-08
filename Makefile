@@ -3,7 +3,7 @@ LDFLAGS = `gsl-config --libs` -lm -L /linuxfs-home/student/hejajama/lib/lib
 
 SOURCES = src/main.cpp src/amplitude.cpp src/tools.cpp src/datafile.cpp \
 	src/solver_force.cpp src/solver_chebyshev.cpp src/chebyshev_amplitude.cpp \
-	src/chebyshev.cpp src/hankel.cpp src/solver_force2.cpp \
+	src/chebyshev.cpp src/hankel.cpp  \
 	src/interpolation.cpp src/spectrum.cpp src/wave_function.cpp \
 	src/virtual_photon.cpp
 FTSOURCES = src/fourier/fourier.c

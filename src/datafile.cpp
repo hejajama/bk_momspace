@@ -91,26 +91,26 @@ DataFile::DataFile(string fname)
     }
 }
 
-void DataFile::GetData(std::vector< std::vector<REAL> > &n)
+void DataFile::GetData(std::vector< std::vector<REAL> > &ln_n,
+                        std::vector<REAL> &rapidities)
 {
-	/*if (n[0].size()>1)	// Contains more that intial condition (which will be overrided also)
-		cerr << "Got non-empty table for amplitude values? " << LINEINFO << endl;
-	*/
-	n.clear();
-    // Return vector where indexes are vec[ktsqr][y]
-    for (unsigned int k=0; k<ktsqrpoints; k++)
+	ln_n.clear();
+    rapidities.clear();
+    // Return vector where indexes are vec[y][ktsqr] containing ln of amplitude
+
+    for (uint yind=0; yind < data.size(); yind++)
     {
         std::vector<REAL> tmpvec;
-        for (unsigned int y=0; y<data.size(); y++)
+        for (uint kind=0; kind<ktsqrpoints; kind++)
         {
-            tmpvec.push_back(data[y][k]);
+            tmpvec.push_back( std::log(data[yind][kind]) );
         }
-        n.push_back(tmpvec);
+        ln_n.push_back(tmpvec);
+
+        rapidities.push_back(yvals[yind]);
+        
     }
-    std::vector<REAL> tmpvec;
-    for (uint y=0; y<data.size(); y++)
-        tmpvec.push_back(0.0);
-    n.push_back(tmpvec);
+    
 }
 
 REAL DataFile::MinKtsqr()
@@ -133,8 +133,5 @@ REAL DataFile::MaxY()
 	return yvals[yvals.size()-1];
 }
 
-REAL DataFile::DeltaY()
-{
-	//NOTE: Assumes that y[n+1]-y[n]=const
-	return yvals[1]-yvals[0];
-}
+
+

@@ -23,9 +23,9 @@ class DataFile
         REAL KtsqrMultiplier();
         REAL KtsqrPoints();
 		REAL MaxY();
-		REAL DeltaY();
 
-        void GetData(std::vector< std::vector<REAL> > &n);
+        void GetData(std::vector< std::vector<REAL> > &ln_n,
+            std::vector<REAL> &rapidities);
 
     private:
         string filename;
