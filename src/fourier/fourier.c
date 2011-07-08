@@ -1,3 +1,15 @@
+/*
+ * (C) notice added by Heikki Mäntysaari <heikki.mantysaari@jyu.fi>:
+ * This code is downloaded from
+ * http://ipht.cea.fr/Pisp/francois.gelis/Soft/Fourier/index.php
+ * Although the license is not specified by the author, it is GNU GPL as
+ * GSL is licensed under the GPL license which forces also this program to
+ * be redistributed under the same license.
+ *
+ * Original author&copyright holder: Francois Gelis
+ * H.M. hasn't made any changes to this file
+ */
+
 // Last modified on June 06th, 2006 -- F. Gelis
 
 
