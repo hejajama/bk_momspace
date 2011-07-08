@@ -39,9 +39,14 @@ REAL Inthelperf_kt_k(REAL kt, void* p);
 REAL Inthelperf_kt_theta(REAL theta, void* p);
 REAL Spectrum::dNch_dydpsqr(REAL sqrts, REAL y, REAL psqr)
 {
+    REAL x1 = std::sqrt(psqr)/sqrts*std::exp(y);
+    REAL x2 = std::sqrt(psqr)/sqrts*std::exp(-y);
 
+    REAL y1 = N->Y(x1);
+    REAL y2 = N->Y(x2);
     //cout << "p_T=" << std::sqrt(psqr) << " y=" << y <<
-    //      " eval_y1=" << N->Y(std::sqrt(psqr)/sqrts*exp(y)) << endl;
+    //      " eval_y1=" << N->Y(std::sqrt(psqr)/sqrts*exp(y)) << " x1=" << x1 << 
+    //      " eval_y2=" << N->Y(std::sqrt(psqr)/sqrts*exp(-y)) << " x2=" << x2 << endl;
     
     REAL p = std::sqrt(psqr);
     Inthelper_kt helper;
