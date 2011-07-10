@@ -61,10 +61,15 @@ void Amplitude::Clear()
 /*
  * Initialize
  * Initial condition must be set
+ * 
+ * NOTE: This function MUST BE called before any value is obtained from
+ * this class.
  */
 void Amplitude::Initialize()
 {
 	Clear();
+    ktsqrpoints =  static_cast<unsigned int>(std::log(maxktsqr/minktsqr) 
+            / std::log(ktsqr_multiplier) );
     for (unsigned int i=0; i<KtsqrPoints(); i++)
     {
         ktsqrvals.push_back(minktsqr * std::pow(ktsqr_multiplier, (int)i) );
@@ -91,6 +96,9 @@ void Amplitude::Initialize()
 
 REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
 {
+    if (ktsqr*0.9999999 > MaxKtsqr() or ktsqr*1.00000001 < MinKtsqr())
+        cerr << "Ktsqrval " << ktsqr << " is out of range [" << 
+            MinKtsqr() << ", "  << MaxKtsqr() << "]! " << LINEINFO << endl;
     
     if (y<eps and datafile==false and derivative==false) return InitialCondition(ktsqr);
     if (y<eps) y=0;
@@ -99,8 +107,6 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
     if (ktsqr < MinKtsqr()) ktsqr=MinKtsqr()*1.00000001;
     // Now we always have MinKtsqr() < ktsqr < MaxKtsqr() => interpolation works
 
-    if (ktsqr > MaxKtsqr() or ktsqr < MinKtsqr())
-        cerr << "Ktsqrval " << ktsqr << " is out of range! " << LINEINFO << endl;
     
     // Find ktsqrval and yval indexes refer to index for which
     // val[index]  is smaller than (or equal) y/ktsqr
@@ -644,7 +650,7 @@ unsigned int Amplitude::YPoints()
 
 unsigned int Amplitude::KtsqrPoints()
 {
-    return static_cast<unsigned int>(std::log(maxktsqr/minktsqr) / std::log(ktsqr_multiplier) );
+    return ktsqrpoints;
 }
 
 REAL Amplitude::DeltaY()

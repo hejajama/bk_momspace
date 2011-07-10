@@ -504,11 +504,9 @@ void GenerateDataFile()
     output << "###" << std::scientific << std::setprecision(15) << N->MinKtsqr() << endl;
     output << "###" << std::scientific << std::setprecision(15) << N->KtsqrMultiplier() << endl;
     output << "###" << ktsqrpoints << endl;
-
-    unsigned int yp = static_cast<int>(maxy/N->DeltaY())+1;
     
     
-    for (unsigned int yind=0; yind <= yp; yind++)
+    for (unsigned int yind=0; yind <= N->YPoints(); yind++)
     {
         //REAL tmpy = miny + (maxy-miny)/(REAL)(y_points) * yind;
         REAL tmpy = N->Yval(yind);

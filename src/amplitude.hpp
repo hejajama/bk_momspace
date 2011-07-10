@@ -13,27 +13,13 @@
 #include <gsl/gsl_multifit.h>
 //#include <bci.h>
 
-const REAL DEFAULT_DELTA_Y=0.1;
-const unsigned int DEFAULT_MAXY=50;
-const REAL DEFAULT_KTSQR_MULTIPLIER = 1.01;  // ktsqr_{i+1} = ktsqr_i*KTSQR_MULTIPLIER
-//const REAL DEFAULT_KTSQR_MULTIPLIER = 1.05;
-const REAL DEFAULT_MINKTSQR = 1e-8; // orig: 1e-8
-const REAL DEFAULT_MAXKTSQR = 1e40;
-
-const REAL SATSCALE_N = 0.05;
-
-//const unsigned int POINTS_Y= (int)(MAXY/DELTA_Y);
-//const unsigned int POINTS_KTSQR = (int)(std::log(MAXKTSQR/MINKTSQR) / std::log(KTSQR_MULTIPLIER) );
-
-const REAL KTSQRINTACCURACY = 0.01;  //0.001;
-const int KTSQRINTITERATIONS = 3000; //1000; //12000;
-const int INTERPOLATION_POINTS = 20;
-const int INTERPOLATION_POINTS_DER=50;  // 50 good if 2000 ktsqrpoints, 100 for 5000
-
-const REAL Q0SQR = 0.24; /*200; */    // 0.24 GeV^2 arXiv:0902.1112
-                            // For AA: *A^(1/3), A=197 (gold)
-                            // Pb: ~208
-
+/*
+ * Class to handle scattering amplitude and related tasks
+ * 
+ * Usage: Class must be set up by calling appropriate SetSvalueX(x) mehtods.
+ * When everyghing is set up, method Intialize() must be called befora 
+ * anything else is done!
+ */
 
 enum INITIAL_CONDITION
 {
@@ -137,6 +123,7 @@ class Amplitude
 
         REAL minktsqr;
         REAL maxktsqr;
+        uint ktsqrpoints;
         REAL ktsqr_multiplier;
         REAL maxy;
         REAL delta_y;
@@ -158,5 +145,25 @@ class Amplitude
         REAL interpolation_rapidity;
         
 };
+
+
+const REAL DEFAULT_DELTA_Y=0.1;
+const unsigned int DEFAULT_MAXY=50;
+const REAL DEFAULT_KTSQR_MULTIPLIER = 1.01;  // ktsqr_{i+1} = ktsqr_i*KTSQR_MULTIPLIER
+//const REAL DEFAULT_KTSQR_MULTIPLIER = 1.05;
+const REAL DEFAULT_MINKTSQR = 1e-8; // orig: 1e-8
+const REAL DEFAULT_MAXKTSQR = 1e40;
+
+const REAL SATSCALE_N = 0.05;
+
+const REAL KTSQRINTACCURACY = 0.01;  //0.001;
+const int KTSQRINTITERATIONS = 3000; //1000; //12000;
+const int INTERPOLATION_POINTS = 20;
+const int INTERPOLATION_POINTS_DER=50;  // 50 good if 2000 ktsqrpoints, 100 for 5000
+
+const REAL Q0SQR = 0.24; /*200; */    // 0.24 GeV^2 arXiv:0902.1112
+                            // For AA: *A^(1/3), A=197 (gold)
+                            // Pb: ~208
+
 
 #endif
