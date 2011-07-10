@@ -470,7 +470,7 @@ void BruteForceSolver::InitializeAdamsMethod()
  */
 REAL BruteForceSolver::InterpolateN(REAL ktsqr, const REAL* array, bool bspline, bool der)
 {
-    int ktsqrind = KtsqrIndex(ktsqr);
+    int ktsqrind = FindIndex(ktsqr, ktsqrvals);
     if (ktsqr >= MaxKtsqr()) // Didn't find, so refers to the largest one 
         return array[ktsqrvals.size()-1];
     if (ktsqr <= MinKtsqr())

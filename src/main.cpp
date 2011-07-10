@@ -560,9 +560,9 @@ void SinglePlot()
     cout << "# ktsqr amplitude initial_condition bspline_amplitude" << endl;
     ktsqr_mult = std::pow(N->KtsqrMultiplier(),1.0/4.0);
 
-    for (int i=0; i<N->KtsqrPoints()-1; i+=10)
+    for (int i=0; i<N->KtsqrPoints()-1; i++)
     {
-        REAL tmpktsqr = N->MinKtsqr()*std::pow(ktsqr_mult, i);
+        REAL tmpktsqr = N->Ktsqrval(i);
         cout << std::scientific << std::setprecision(15) << tmpktsqr << " " <<
             N->N(tmpktsqr, y) << " " << N->InitialCondition(tmpktsqr)
             << " " << N->N(tmpktsqr, y, true) << endl;

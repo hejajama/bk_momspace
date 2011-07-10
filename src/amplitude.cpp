@@ -96,7 +96,8 @@ void Amplitude::Initialize()
 
 REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
 {
-    if (ktsqr*0.9999999 > MaxKtsqr() or ktsqr*1.00000001 < MinKtsqr())
+    REAL lnktsqr = std::log(ktsqr);
+    if (lnktsqr > lnktsqrvals[KtsqrPoints()-1] or lnktsqr < lnktsqrvals[0])
         cerr << "Ktsqrval " << ktsqr << " is out of range [" << 
             MinKtsqr() << ", "  << MaxKtsqr() << "]! " << LINEINFO << endl;
     
@@ -110,8 +111,9 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
     
     // Find ktsqrval and yval indexes refer to index for which
     // val[index]  is smaller than (or equal) y/ktsqr
-    int yind = -1;
-    int ktsqrind = KtsqrIndex(ktsqr);
+    int ktsqrind = FindIndex(ktsqr, ktsqrvals);
+    int yind = FindIndex(y, yvals);
+    
     for (unsigned int i=0; i<yvals.size()-1; i++)
     {
         if (yvals[i]<=y and yvals[i+1]>y)
@@ -120,12 +122,11 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
             break;
         }
     }
-    if (yind < 0) // Didn't find, so refers to the largest one 
+    if (yind < 0 or ktsqrind<0) 
     {
-        yind=yvals.size()-1;
-        if (y-yvals[yind]>0.05)
-            cerr << "Asked amplitude at too large Y=" << y << ", falling back to "
-                << " y=" << yvals[yind] << ". " << LINEINFO << endl;
+        cerr << "Something very weird happened at " << LINEINFO << " with "
+        << "ktsqr=" << ktsqr << ", y=" << y << endl;
+        return 0;
     }
         
     // Keep y fixed, interpolate ktsqr
@@ -154,8 +155,6 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
     // with that
     ///TODO: Why?
     if (ktsqrind>0 and interpolation_start==0) { interpolation_start=1; }
-
-    //cout << "interp range " << interpolation_start << " - " << interpolation_end << " index " << ktsqrind << endl;
     
 	int interpo_points = interpolation_end - interpolation_start+1;
     
@@ -258,7 +257,7 @@ REAL Derivhelperf_loglog(REAL ktsqr, void* p)
 REAL Amplitude::LogLogDerivative(REAL ktsqr, REAL rapidity)
 {
 
-    int ktsqrind = KtsqrIndex(ktsqr);
+    int ktsqrind = FindIndex(ktsqr, ktsqrvals);
     if (ktsqrind==0 or ktsqrind >= KtsqrPoints())
     {
         cerr << "Can't calculate derivative at the edge of the ktsqr range. "
@@ -645,7 +644,6 @@ void Amplitude::SetDeltaY(REAL dy)
 unsigned int Amplitude::YPoints()
 {
     return yvals.size()-1;
-    //return static_cast<unsigned int>(maxy/delta_y)+1;
 }
 
 unsigned int Amplitude::KtsqrPoints()
@@ -720,24 +718,42 @@ REAL Amplitude::Y(REAL xbj)
 }
 
 /* Returns index i for which
- * ktsqrvals[i]<=ktsqr<ktsqrvals[i+1]
+ * vec[i]<=val
  * If such index can't be found, returns -1
  */
-int Amplitude::KtsqrIndex(REAL ktsqr)
+
+int Amplitude::FindIndex(REAL val, std::vector<REAL> &vec)
 {
-    int ktsqrind=-1;
-    if (ktsqr< MinKtsqr() or ktsqr > MaxKtsqr()) return -1;
-    for (unsigned int i=0; i<KtsqrPoints()-1; i++)
+    if (val < vec[0]) return -1;
+    
+    int ind=-1;
+    
+    uint start=0; uint end=vec.size()-1;
+    while(end-start>10)
     {
-        if (ktsqrvals[i]<=ktsqr and ktsqrvals[i+1]>ktsqr)
+        int tmp = static_cast<int>((start+end)/2.0);
+        
+        if (vec[tmp]>=val)
+            end=tmp;
+        else
+            start=tmp;
+    }
+    
+    
+    for (uint i=start; i<=end; i++)
+    {
+        if (vec[i]<=val and vec[i+1]>val)
         {
-            ktsqrind=i;
+            ind=i;
             break;
         }
     }
-    if (ktsqrind==-1) return KtsqrPoints()-1;
-    return ktsqrind;
+    if (ind == -1) return vec.size()-1;
+    return ind;
 }
+
+
+
 
 /*
  * Add new rapidity value for tables

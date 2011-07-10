@@ -94,7 +94,7 @@ class Amplitude
         virtual REAL MinKtsqr();
         virtual REAL MaxKtsqr();
 
-        int KtsqrIndex(REAL ktsqr);
+        int FindIndex(REAL val, std::vector<REAL> &vec);
 
 
         REAL InitialCondition(REAL ktsqr);  // N() at y=0
