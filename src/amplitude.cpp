@@ -40,6 +40,7 @@ Amplitude::Amplitude()
     interpolation_points = INTERPOLATION_POINTS;
 
     running_coupling = CONSTANT;
+    alphas_scaling=1.0;
 }
 
 /*
@@ -70,6 +71,7 @@ void Amplitude::Initialize()
 	Clear();
     ktsqrpoints =  static_cast<unsigned int>(std::log(maxktsqr/minktsqr) 
             / std::log(ktsqr_multiplier) );
+    maxktsqr = minktsqr * std::pow(ktsqr_multiplier, (int)ktsqrpoints);
     for (unsigned int i=0; i<KtsqrPoints(); i++)
     {
         ktsqrvals.push_back(minktsqr * std::pow(ktsqr_multiplier, (int)i) );
@@ -103,8 +105,7 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
     
     if (y<eps and datafile==false and derivative==false) return InitialCondition(ktsqr);
     if (y<eps) y=0;
-    if (ktsqr>MaxKtsqr() and derivative==false) return 0;
-    if (ktsqr>MaxKtsqr() and derivative) ktsqr=MaxKtsqr()*0.9999999;
+    if (ktsqr>=MaxKtsqr()) return 0;
     if (ktsqr < MinKtsqr()) ktsqr=MinKtsqr()*1.00000001;
     // Now we always have MinKtsqr() < ktsqr < MaxKtsqr() => interpolation works
 
@@ -533,22 +534,23 @@ string Amplitude::InitialConditionStr()
     switch (ic)
     {
         case INVPOWER:
-            return "(kt^2 + 1)^(-1), BK in full momentum space, hep-ph/0504080";
+            s << "(kt^2 + 1)^(-1), BK in full momentum space, hep-ph/0504080";
             break;
         case FTIPSAT:
             s << "0.5*Gamma[0, kt^2/Q_s0^2], FT of 1-exp(-r^2 Q_s0^2/4),"
                 << " Q_s0^2 = " << Q0SQR << " GeV^2";
-            return s.str();
             break;
         case INVPOWER4:
-            return "(kt^4+1)^(-1), arbitrary";
+            s << "(kt^4+1)^(-1), arbitrary";
             break;
         case GAUSS:
-            return "Exp[-(Log[k^2] + 2)^2/5], hep-ph/0110325";
+            s << "Exp[-(Log[k^2] + 2)^2/5], hep-ph/0110325";
+            break;
         default:
             return "Unknown initial condition";
             break;
     }
+    return s.str();
 }
 
 string Amplitude::RunningCouplingStr()
@@ -557,17 +559,23 @@ string Amplitude::RunningCouplingStr()
 	{
 		return "Data is read from a file, don't know what running coupling was used";
 	}
+    std::stringstream s;
     switch (running_coupling)
     {
     case CONSTANT:
         return "Constant";
     case PARENT_DIPOLE:
-        return "Parent dipole";
+        s << "Parent dipole";
+        break;
     case MINK:
-        return "MINK";
+        s << "MINK";
+        break;
     case MAXK:
-        return "MAXK";
+        s << "MAXK";
+        break;
     }
+    s << " \\alpha_s scaling factor: " << alphas_scaling;
+    return s.str();
 }
 
 
@@ -779,4 +787,14 @@ void Amplitude::AddRapidity(REAL y)
     ln_n.push_back(tmpvec);
     derivatives.push_back(tmpdervec);
 
+}
+
+void Amplitude::SetAlphasScaling(REAL scaling)
+{
+    alphas_scaling = scaling;
+}
+
+REAL Amplitude::AlphasScaling()
+{
+    return alphas_scaling;
 }

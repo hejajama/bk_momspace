@@ -28,6 +28,13 @@ struct Inthelper_hankel
 REAL Helperf_hankel(REAL kt, void* p)
 {
     Inthelper_hankel* par = (Inthelper_hankel*)p;
+
+    // FT is calculated over interval [0,\infty], but we only know
+    // amplitude with ktsqr>MinKtsqr()
+    // BesselJ[0,0]=1 => error is < MinKtsqr() \approx 0!
+    if (SQR(kt) < par->N->MinKtsqr()) return 0;
+    if (SQR(kt) > par->N->MaxKtsqr()) cout << "ktsqr is " << SQR(kt) << endl;
+    
     //cout << "helper called at kt=" << kt << ", y=" << par->y << endl;
     return kt*par->N->N(SQR(kt), par->y);
 }

@@ -77,6 +77,7 @@ bool kc=false;  // Kinematical constraint
 RUNNING_COUPLING running_coupling=CONSTANT;
 bool scale_sat=false;  // Scale k_T with the scaturation scale
 REAL sqrts = 7000;  // Center of mass energy
+REAL alphas_scaling = 1.0;
 
 METHOD method=BRUTEFORCE;
 
@@ -144,6 +145,7 @@ int main(int argc, char* argv[])
         cout << "-chebyshev_degree [number]: number of basis vectors" << endl;
         cout << "-minktsqr [val], -maxktsqr [val], -ktsqrpoints [val]" << endl;
         cout << "-scale_sat: scale k_T by saturation scale" << endl;
+        cout << "-alphas_scaling scale: scale k_T^2 in \\alpha_s by given factor" << endl;
         return 0;
     }
 
@@ -208,6 +210,8 @@ int main(int argc, char* argv[])
             ktsqrpoints = StrToInt(argv[i+1]);
         else if (string(argv[i])=="-sqrts")
             sqrts = StrToReal(argv[i+1]);
+        else if (string(argv[i])=="-alphas_scaling")
+            alphas_scaling = StrToReal(argv[i+1]);
         else if (string(argv[i])=="-load_matrix")
         {
             cheb_matrix = LOAD;
@@ -304,6 +308,7 @@ int main(int argc, char* argv[])
     N->SetMinKtsqr(minktsqr);
     N->SetKtsqrMultiplier( std::pow( maxktsqr/minktsqr,
         1.0/static_cast<REAL>(ktsqrpoints+1.0) ) );
+    N->SetAlphasScaling(alphas_scaling);
     
     if (N->YPoints()<2 and method==BRUTEFORCE and mode==GENERATE_DATAFILE)
     {
@@ -571,6 +576,8 @@ void SinglePlot()
 
 /*
  * Plot amplitude in r-space at given rapidity
+ *
+ * NOTE: This may not be thread-safe
  */
 
 REAL Inthelperf_ft(REAL ktqr, void* p)
@@ -584,10 +591,15 @@ void SinglePlotR()
     Hankel transform(N);
     REAL minr=1e-6; REAL maxr=5e2; int rpoints=80;
     REAL mult = std::pow(maxr/minr, 1.0/static_cast<REAL>(rpoints));
+    #pragma omp parallel for
     for (int i=0; i<=rpoints; i++)
     {
         REAL tmpr = minr*std::pow(mult, i);
-        cout << tmpr << " " <<transform.Amplitude_r(tmpr, y) << endl;
+        REAL amp = transform.Amplitude_r(tmpr, y);
+        #pragma omp critical
+        {
+            cout << tmpr << " " << amp << endl;
+        }
     }
 
 }

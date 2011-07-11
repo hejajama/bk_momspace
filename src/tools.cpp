@@ -61,9 +61,9 @@ void ErrHandler(const char * reason,
  */
 REAL Alpha_s(REAL Qsqr, REAL scaling)
 {
-    if (Qsqr < LAMBDAQCD2)
+    if (scaling*Qsqr < LAMBDAQCD2)
         return MAXALPHA;
-    REAL alpha = 12.0*M_PI/( (33.0-2.0*Nf)*log(Qsqr/LAMBDAQCD2) );
+    REAL alpha = 12.0*M_PI/( (33.0-2.0*Nf)*log(scaling*Qsqr/LAMBDAQCD2) );
     if (alpha > MAXALPHA)
         return MAXALPHA;
     return alpha;

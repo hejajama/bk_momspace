@@ -81,6 +81,8 @@ class Amplitude
         void SetKtsqrMultiplier(REAL m);
         void SetMaxY(REAL y);
         void SetDeltaY(REAL dy);
+        void SetAlphasScaling(REAL scale);
+        REAL AlphasScaling();
 
         void SetInterpolationPoints(int p);
 
@@ -134,6 +136,8 @@ class Amplitude
 
         bool datafile;	// True if data is read from external file
 
+        REAL alphas_scaling;
+
         // Bspline interpolation
         REAL bspline_y;
         gsl_bspline_workspace *bw;
@@ -158,7 +162,7 @@ const REAL SATSCALE_N = 0.05;
 
 const REAL KTSQRINTACCURACY = 0.01;  //0.001;
 const int KTSQRINTITERATIONS = 3000; //1000; //12000;
-const int INTERPOLATION_POINTS = 20;
+const int INTERPOLATION_POINTS = 8;
 const int INTERPOLATION_POINTS_DER=50;  // 50 good if 2000 ktsqrpoints, 100 for 5000
 
 const REAL Q0SQR = 0.24; /*200; */    // 0.24 GeV^2 arXiv:0902.1112
