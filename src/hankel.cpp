@@ -59,7 +59,7 @@ Hankel::Hankel(Amplitude* amp)
     // encoded in the table in the file fourier.c)
     set_fpu_state();
     //gsl_set_error_handler_off();
-    init_workspace_fourier(1000);
+    init_workspace_fourier(2000);
     set_fourier_precision(1.0e-12,1.0e-12);
        
 }
