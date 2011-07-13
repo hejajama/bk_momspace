@@ -570,7 +570,7 @@ void SinglePlot()
         REAL tmpktsqr = N->Ktsqrval(i);
         cout << std::scientific << std::setprecision(15) << tmpktsqr << " " <<
             N->N(tmpktsqr, y) << " " << N->InitialCondition(tmpktsqr)
-            << " " << N->N(tmpktsqr, y, true) << endl;
+            << " " << /*N->N(tmpktsqr, y, true)*/ 0 << endl;
     }
 }
 
@@ -614,8 +614,6 @@ void SaturationScale()
 
     // Bspline interpolation
     int points = static_cast<int>(maxy/0.1);
-    REAL *yarray = new REAL[points];
-    REAL *qsarray = new REAL[points];
 
     const int interpolation_points=20;
     int interpolation_start, interpolation_end;

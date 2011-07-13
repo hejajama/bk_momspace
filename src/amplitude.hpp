@@ -160,8 +160,10 @@ const REAL DEFAULT_MAXKTSQR = 1e40;
 
 const REAL SATSCALE_N = 0.05;
 
-const REAL KTSQRINTACCURACY = 0.01;  //0.001;
-const int KTSQRINTITERATIONS = 3000; //1000; //12000;
+const REAL MINLN_N = -999;  // ln 0 = -\infty, so we need some finite lower cut
+
+const REAL KTSQRINTACCURACY = 0.005;  //0.001;
+const int KTSQRINTITERATIONS = 5000; // May be possible to use smaller one
 const int INTERPOLATION_POINTS = 8;
 const int INTERPOLATION_POINTS_DER=50;  // 50 good if 2000 ktsqrpoints, 100 for 5000
 

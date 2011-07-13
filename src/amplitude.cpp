@@ -85,7 +85,10 @@ void Amplitude::Initialize()
     std::vector<REAL> tmpdervec;
     for (uint i=0; i<KtsqrPoints(); i++)
     {
-        tmpvec.push_back(std::log( InitialCondition( ktsqrvals[i] ) ) );
+        REAL icval = InitialCondition( ktsqrvals[i] );
+        REAL logicval = std::log(icval);
+        if (logicval > MINLN_N) tmpvec.push_back(logicval);
+        else tmpvec.push_back(MINLN_N);
         tmpdervec.push_back(0.0);
     }
     ln_n.push_back(tmpvec);
@@ -105,24 +108,23 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
     
     if (y<eps and datafile==false and derivative==false) return InitialCondition(ktsqr);
     if (y<eps) y=0;
-    if (ktsqr>=MaxKtsqr()) return 0;
-    if (ktsqr < MinKtsqr()) ktsqr=MinKtsqr()*1.00000001;
-    // Now we always have MinKtsqr() < ktsqr < MaxKtsqr() => interpolation works
-
-    
+    int ktsqrind;
+    if (lnktsqr>=lnktsqrvals[KtsqrPoints()-1]) return 0;
     // Find ktsqrval and yval indexes refer to index for which
     // val[index]  is smaller than (or equal) y/ktsqr
-    int ktsqrind = FindIndex(ktsqr, ktsqrvals);
+    if (lnktsqr <= lnktsqrvals[0])
+    {
+        ktsqrind = 0;
+        lnktsqr=lnktsqrvals[0]*0.99999;  // lnktsqrvals[0]<0
+        ktsqr = std::exp(lnktsqr);
+    }
+    else
+        ktsqrind = FindIndex(lnktsqr, lnktsqrvals);
+    
+    // Now we always have MinKtsqr() < ktsqr < MaxKtsqr() => interpolation works
+
     int yind = FindIndex(y, yvals);
     
-    for (unsigned int i=0; i<yvals.size()-1; i++)
-    {
-        if (yvals[i]<=y and yvals[i+1]>y)
-        {
-            yind=i;
-            break;
-        }
-    }
     if (yind < 0 or ktsqrind<0) 
     {
         cerr << "Something very weird happened at " << LINEINFO << " with "
@@ -135,7 +137,7 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
     // almost fast
     // Interpolate linearly in y and use spline in ktsqr
 
-    unsigned int interpolation_start, interpolation_end;
+    int interpolation_start, interpolation_end;
     if (ktsqrind - interpolation_points/2 < 0)
     {
 		interpolation_start=0;
@@ -184,11 +186,14 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
     if (derivative)
     {
         // Derivative returns d ln(N) / d ln k^2 = k^2/N dN/dk^2
-        res = interp.Derivative(std::log(ktsqr))
-            * std::exp(interp.Evaluate(std::log(ktsqr))) / ktsqr;
+        res = interp.Derivative(lnktsqr)
+            * std::exp(interp.Evaluate(lnktsqr)) / ktsqr;
     }
     else
-        res = std::exp( interp.Evaluate(std::log(ktsqr) ) );
+        res = std::exp( interp.Evaluate(lnktsqr) ) ; 
+
+    //if (! (res<1e99 and res>10) )
+    //    cerr << "O-ou\n";
 
     delete[] tmparray;
     delete[] tmpxarray;

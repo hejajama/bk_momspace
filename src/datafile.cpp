@@ -6,6 +6,7 @@
 #include "tools.hpp"
 #include "config.hpp"
 #include "datafile.hpp"
+#include "amplitude.hpp"
 #include <fstream>
 #include <sstream>
 using std::ifstream;
@@ -103,7 +104,10 @@ void DataFile::GetData(std::vector< std::vector<REAL> > &ln_n,
         std::vector<REAL> tmpvec;
         for (uint kind=0; kind<ktsqrpoints; kind++)
         {
-            tmpvec.push_back( std::log(data[yind][kind]) );
+            REAL tmpln_n = std::log(data[yind][kind]);
+            if (tmpln_n > MINLN_N) tmpvec.push_back(tmpln_n);
+            else
+                tmpvec.push_back(MINLN_N);
         }
         ln_n.push_back(tmpvec);
 

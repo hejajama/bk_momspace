@@ -79,11 +79,14 @@ REAL inthelperf_bkmom_noconstraint(REAL lnktsqr, void* p)
         ///FIXME: HANDLE NEXT TO LOWEST STEP
         */
     }
-    else   
-        result += ( n - std::exp(par->lnktsqr - lnktsqr)*parn )
-            / std::abs( 1.0 - std::exp(par->lnktsqr - lnktsqr) );
-    
-    result += parn/std::sqrt( 4.0*std::exp(2.0*(lnktsqr - par->lnktsqr)) + 1.0);
+    else
+        result += (n - parktsqr/ktsqr * parn) / std::abs( 1.0 - parktsqr/ktsqr);
+      
+    //    result += ( n - std::exp(par->lnktsqr - lnktsqr)*parn )
+    //        / std::abs( 1.0 - std::exp(par->lnktsqr - lnktsqr) );
+
+    //result += parn/std::sqrt( 4.0*std::exp(2.0*(lnktsqr - par->lnktsqr)) + 1.0);
+    result += parn/std::sqrt( 4.0*SQR(ktsqr / parktsqr) + 1.0 );
 
     if (par->N->RunningCoupling() == MAXK)
         result *= Alphabar_s(std::max(ktsqr, parktsqr), par->N->AlphasScaling());
@@ -91,7 +94,7 @@ REAL inthelperf_bkmom_noconstraint(REAL lnktsqr, void* p)
         result *= Alphabar_s(std::min(ktsqr, parktsqr), par->N->AlphasScaling());
 
     if (isnan(result))
-        cerr << "errör at ktsqr=" << ktsqr << " parktsqr " << parktsqr << " n " << n
+        cerr << "error at ktsqr=" << ktsqr << " parktsqr " << parktsqr << " n " << n
         << " parn " << parn << " res " << result << endl;
     return result;
 }
@@ -117,7 +120,7 @@ REAL inthelperf_bkmom_constraint(REAL lnktsqr, void* p)
     REAL n0 = par->N->N(parktsqr, par->y);  
 
     REAL result=0;
-    if (std::abs(lnktsqr - par->lnktsqr) < 1e-15)
+    if (std::abs(lnktsqr - par->lnktsqr) < 1e-5)
     {
         //cerr << "ktsqr \\approx par->ktsqr and we can't handle this! y=" << par->y
         //    << " par->ktsqr=" << parktsqr << " at " << LINEINFO << endl;
@@ -129,15 +132,21 @@ REAL inthelperf_bkmom_constraint(REAL lnktsqr, void* p)
             result += par->N->N(ktsqr, par->y);
         else
             result += par->N->N(ktsqr, par->y - (lnktsqr - par->lnktsqr));
-        result -= std::exp(par->lnktsqr - lnktsqr)*n0;
-        result /= std::abs( 1.0 - std::exp(par->lnktsqr - lnktsqr) );
+        //result -= std::exp(par->lnktsqr - lnktsqr)*n0;
+        result -= parktsqr / ktsqr * n0;
+        //result /= std::abs( 1.0 - std::exp(par->lnktsqr - lnktsqr) );
+        result /= std::abs( 1.0 - parktsqr/ktsqr );
     }
-    result += n0/std::sqrt( 4.0*std::exp(2.0*(lnktsqr - par->lnktsqr)) + 1.0);
+    //result += n0/std::sqrt( 4.0*std::exp(2.0*(lnktsqr - par->lnktsqr)) + 1.0);
+    result += n0/std::sqrt( 4.0* SQR(ktsqr/parktsqr) + 1.0 );
 
     if (par->N->RunningCoupling() == MAXK)
         result *= Alphabar_s(std::max(ktsqr, parktsqr), par->N->AlphasScaling());
     else if (par->N->RunningCoupling() == MINK)
         result *= Alphabar_s(std::min(ktsqr, parktsqr), par->N->AlphasScaling());
+
+    if (isnan(result))
+        cerr << "Integrand is NaN at lnktsqr=" << lnktsqr << endl;
 
     return result;
 }
@@ -166,7 +175,6 @@ REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y, const REAL* array)
 
     REAL result, abserr;
     int ktsqriter = KTSQRINTITERATIONS;
-    if (ktsqriter >= KtsqrPoints()) ktsqriter = KtsqrPoints()-1;
     gsl_integration_workspace *workspace 
      = gsl_integration_workspace_alloc(ktsqriter);
 
@@ -222,13 +230,12 @@ int Evolve(REAL y, const REAL amplitude[], REAL dydt[], void *params)
    return GSL_SUCCESS;
 }
 
-
+const REAL MINSTEP=0.005;
 // Solve BK, lowest order
 void BruteForceSolver::Solve(REAL maxy)
 {
 
     int largedifference=0;
-    int starty=1;
     REAL Y=0;   // We are allways solved amplitude up to Y
     int yind=0; // yvals[yind]=Y always
     REAL nexty=delta_y/4;   // smaller step size a the beginning
@@ -325,7 +332,8 @@ void BruteForceSolver::Solve(REAL maxy)
 
             // Adaptive step size (quite stupid one)
             // If reldiff > 0.1 and absdiff > 1e-5 then use smaller step size
-            if (std::abs(dy*tmpder) > 1e-3 and std::abs(dy*tmpder/oldn > 0.1))
+            if (std::abs(dy*tmpder) > 1e-3 and std::abs(dy*tmpder/oldn > 0.05)
+                and (nexty-Y)*2.0/3.0 > MINSTEP)
             {
                 nexty = Y + (nexty-Y)*2.0/3.0;
                 cout << "Taking smaller step size " <<nexty-Y <<". ";
