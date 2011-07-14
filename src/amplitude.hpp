@@ -54,6 +54,7 @@ class Amplitude
         void IntializeBSpline(int ktsqrind, REAL rapidity);
 
         REAL SaturationScale(REAL y);
+        REAL SaturationScaleR(REAL y);
         REAL SolveKtsqr(REAL y, REAL amp);
         
         void AddDataPoint(int ktsqrindex, int yindex, REAL value, REAL der);

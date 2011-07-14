@@ -20,6 +20,7 @@
 #include <gsl/gsl_min.h>
 #include <gsl/gsl_roots.h>
 #include "interpolation.hpp"
+#include "hankel.hpp"
 
 
 #include <cmath>
@@ -484,6 +485,68 @@ REAL Amplitude::SolveKtsqr(REAL y, REAL amp)
 
     return std::sqrt(res);
 
+}
+
+/*
+ * Solve saturation scale in r space
+ * Defined as N(r=1/Q_s) = const
+ */
+const REAL SATSCALE_R = 0.2;
+struct SatscaleRHelper
+{
+    Hankel *transf;
+    REAL y;
+};
+
+REAL SatscaleRHelperf(REAL lnr, void* p)
+{
+    SatscaleRHelper* par = (SatscaleRHelper*)p;
+    return par->transf->Amplitude_r(std::exp(lnr), par->y) - SATSCALE_R;
+}
+
+REAL Amplitude::SaturationScaleR(REAL y)
+{
+    const int MAX_ITER = 30;
+    const REAL ROOTFINDACCURACY = 0.05;
+    
+    Hankel transform(this);
+    SatscaleRHelper help; help.transf = &transform;
+    help.y=y;
+    gsl_function f; f.params=&help;
+    f.function=SatscaleRHelperf;
+
+    const gsl_root_fsolver_type *T = gsl_root_fsolver_bisection;
+    gsl_root_fsolver *s = gsl_root_fsolver_alloc(T);
+    REAL minlnr = std::log(1e-5);
+    REAL maxlnr = std::log(10);
+    gsl_root_fsolver_set(s, &f, minlnr, maxlnr);
+
+    int iter=0; int status; REAL min,max;
+    do
+    {
+        iter++;
+        gsl_root_fsolver_iterate(s);
+        min = gsl_root_fsolver_x_lower(s);
+        max = gsl_root_fsolver_x_upper(s);
+        status = gsl_root_test_interval(min, max, 0, ROOTFINDACCURACY);
+        //cout << "y=" << y <<", interval " << std::exp(min) << " - " << std::exp(max) << endl;
+
+    } while (status == GSL_CONTINUE and iter < MAX_ITER);
+
+    REAL res = gsl_root_fsolver_root(s);
+
+    if (iter>=MAX_ITER)
+    {
+        cerr << "Solving failed at y=" << y << " at " << LINEINFO <<
+            " result " << std::exp(res) << " relaccuracy "
+            << (std::exp(max)-std::exp(min))/std::exp(res) << endl;
+    }
+
+
+    gsl_root_fsolver_free(s);
+
+    return std::exp(-res);
+    
 }
 
 REAL Amplitude::InitialCondition(REAL ktsqr)

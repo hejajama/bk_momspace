@@ -41,6 +41,7 @@ enum MODE
     GENERATE_SINGLE_RPLOT,  // Print amplitude in r-space at a given rapidity
     LOGLOG_DERIVATIVE,   // Calculate d ln N(k^2) / d ln(k^2)
     SATURATION_SCALE,       // Calculate Q_s as a function of y up to maxy
+    SATURATION_SCALE_R,     // Calculate N(r=1/Q_s) = const saturation scale
     PT_SPECTRUM,            // Print dN_{ch} / dyd^2p_T as a function of p_T
     PSEUDOY_SPECTRUM,       // dN_{ch} / d\eta, pseudorapidity spectrum
     UGD                     // Plot uninteg. gluon density as a function of k_T
@@ -104,6 +105,7 @@ void SinglePlot();
 void SinglePlotR();     // FT to r-space
 void Clear();
 void SaturationScale();
+void SaturationScaleR();
 void ParticleSpectrum_pt();  //dN_ch / dyd2pt as a function of sqrt(s)
 void ParticleSpectrum_pseudoy();
 void UnintegratedGluonDistribution(); // Plot unintegrated gluon density as a function of k_T
@@ -125,7 +127,7 @@ int main(int argc, char* argv[])
     {
         cout << "Usage: " << endl;
         cout << "-mode [MODE]: what to do, modes: GENERATE_DATA, GENERATE_PLOTS, SINGLE_PLOT, SINGLE_RPLOT, LOGLOG_DERIVATIVE " << endl;
-        cout << "              SATURATION_SCALE PT_SPECTRUM PSEUDOY_SPECTRUM UGD" << endl;
+        cout << "              SATURATION_SCALE[_R] PT_SPECTRUM PSEUDOY_SPECTRUM UGD" << endl;
         cout << "-method [METHOD]: what method is used to solve BK, methods: BRUTEFORCE, CHEBYSHEV" << endl;
         cout << "-output [prefix]: set output file prefix, filenames are prefix_y[rapidity].dat" << endl;
         cout << "-miny, -maxy: rapidity values to solve" << endl;
@@ -256,6 +258,8 @@ int main(int argc, char* argv[])
                 mode=GENERATE_SINGLE_RPLOT;
             else if (string(argv[i+1])=="SATURATION_SCALE")
                 mode = SATURATION_SCALE;
+            else if (string(argv[i+1])=="SATURATION_SCALE_R")
+                mode = SATURATION_SCALE_R;
             else if (string(argv[i+1])=="PT_SPECTRUM")
                 mode = PT_SPECTRUM;
             else if (string(argv[i+1])=="PSEUDOY_SPECTRUM")
@@ -447,6 +451,8 @@ int main(int argc, char* argv[])
         SinglePlotR();
     else if (mode==SATURATION_SCALE)
         SaturationScale();
+    else if (mode==SATURATION_SCALE_R)
+        SaturationScaleR();
     else if (mode==PT_SPECTRUM)
         ParticleSpectrum_pt();
     else if (mode==PSEUDOY_SPECTRUM)
@@ -657,6 +663,20 @@ void SaturationScale()
         delete[] yarray;
         delete[] qsarray;
     }
+}
+
+/*
+ * Calculate Saturation scale N(r=1/Q_s) = const
+ */
+void SaturationScaleR()
+{
+    cout << "# Saturation scale N(r=1/Q_s) = const" << endl;
+    cout << "# y     Q_s [1/GeV]" << endl;
+    for (REAL y=0.5; y<maxy; y+=0.5)
+    {
+        cout << y << " " << N->SaturationScaleR(y) << endl;
+    }
+
 }
 
 // dN_{ch} / dydp^2
