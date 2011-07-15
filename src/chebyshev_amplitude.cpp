@@ -100,6 +100,8 @@ REAL Integrand_helperu(REAL u, void *p)
         << ": Result " << result << ", abserror: " << abserr 
         << " (u=" << u <<")" << endl;
     //cout << "u integral gave " << result << " at v=" << v << endl;
+    if (h->N->RunningCoupling()==PARENT_DIPOLE)
+        result *= Alphabar_s(h->N->Ktsqr(u));     ///TODO: ok?
     return result;
     
     
@@ -320,7 +322,17 @@ void ChebyshevAmplitudeSolver::Solve(REAL maxy)
      * which is computed beforehand. If kinematical constraint is applied,
      * this integral contains extra constraint \theta(u-v)
      */
-    
+
+    if (YPoints()==0)
+    {
+        int ypoints = static_cast<int>(maxy/delta_y) + 1;
+        yvals.clear();
+        for (int i=0; i<=ypoints; i++)
+        {
+            yvals.push_back(i*delta_y);
+        }
+        Prepare();
+    }
 
     // Evolve up to maxy
     // Find maxyind corresponding to maxy
@@ -345,8 +357,16 @@ void ChebyshevAmplitudeSolver::Solve(REAL maxy)
                 //cout << "coef[" << yind-1 << "][" << tmpind << "]*mat[tmpind][" << aind << endl;
                 dera += coef[yind-1][tmpind]*mat[aind][tmpind];
             }
-            dera *= (M1()+M2())*alphabar;
-            dera -= alphabar*NonLinear(aind, yind-1);
+            if (RunningCoupling()==CONSTANT)
+            {
+                dera *= (M1()+M2())*alphabar;
+                dera -= alphabar*NonLinear(aind, yind-1);
+            }
+            else
+            {
+                dera *= (M1()+M2());
+                dera -= NonLinear(aind, yind-1);
+            }
 
             if (kinematic_constraint)
             {
@@ -402,7 +422,10 @@ struct inthelper_nonlin
 REAL inthelperf_nonlin(REAL x, void* par)
 {
     inthelper_nonlin* p = (inthelper_nonlin*) par;
-    return p->N->Basis(p->m, x)*SQR(p->N->N(p->N->Ktsqr(x), p->y) );
+    REAL result = p->N->Basis(p->m, x)*SQR(p->N->N(p->N->Ktsqr(x), p->y) );
+    if (p->N->RunningCoupling()==PARENT_DIPOLE)
+        result *= Alphabar_s(p->N->Ktsqr(x));
+    return result; 
     
     
 }
@@ -674,7 +697,7 @@ void ChebyshevAmplitudeSolver::Prepare()
     m1 = -std::log(MinKtsqr());
     m2 = std::log(MaxKtsqr());
     m1=0;   // => v \in [-1,1]
-
+    
     
     for (unsigned int yind=0; yind <= YPoints(); yind++)
     {
@@ -702,14 +725,14 @@ void ChebyshevAmplitudeSolver::Prepare()
 
 
     ///DEBUG
-   for (REAL u=-1; u<=1; u+=0.01)
+   /*for (REAL u=-1; u<=1; u+=0.01)
     {
         REAL tmpres=0;
         for (int i=0; i<=chebyshev_degree; i++)
             tmpres += coef[0][i]*Basis(i, u);
         cout << Ktsqr(u) << " " << tmpres << " " << InitialCondition(Ktsqr(u)) << endl; 
     }
-    exit(1);
+    exit(1); */
     
 
 }
@@ -775,7 +798,7 @@ void ChebyshevAmplitudeSolver::ComputeBasisVectors()
  * Interpolates between rapidites linearly (TODO: spline?)
  * Or interpolate coefficients?
  */
-REAL ChebyshevAmplitudeSolver::N(REAL ktsqr, REAL y, bool bspline)
+REAL ChebyshevAmplitudeSolver::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
 {
     // Find yind
     // val[index]  is smaller than (or equal) y
