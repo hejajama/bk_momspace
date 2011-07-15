@@ -14,7 +14,7 @@
 
 
 extern int Nzeros;
-extern double *workspace;
+//extern double *workspace;
 
 
 #ifndef FORTRAN

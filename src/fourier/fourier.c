@@ -9,6 +9,9 @@
  * Original author&copyright holder: Francois Gelis
  * Changes by H.M: J0zero and J1zero are now defined in separeted .h
  * files and the number of zeroes is increased
+ * gsl_sum_levin_u_workspace *workspace is now intialized and destroyed
+ * every time fourier_j_i is called in order to make this thread-safe
+ * (but adds a bit overhead, sorry).
  */
 
 // Last modified on June 06th, 2006 -- F. Gelis
@@ -42,7 +45,7 @@ typedef struct {
 
 
 static int Nzeros;
-static gsl_sum_levin_u_workspace *workspace;
+//static gsl_sum_levin_u_workspace *workspace;
 static double epsilon1=1.0e-12;
 static double epsilon=1.0e-12;
 
@@ -113,6 +116,7 @@ double fourier_j_i(x,Ni,func,param,n)
   int precision_OK=0;
   int j;
   fourier_int_data params;
+  gsl_sum_levin_u_workspace *workspace=gsl_sum_levin_u_alloc (1+Nzeros);
   gsl_integration_workspace *gsl_wksp=gsl_integration_workspace_alloc(4000);
   gsl_function F;
   double *tmp=(double *)malloc(Nzeros*sizeof(double));
@@ -161,6 +165,7 @@ double fourier_j_i(x,Ni,func,param,n)
   }
   gsl_integration_workspace_free(gsl_wksp);
   free(tmp);
+  gsl_sum_levin_u_free(workspace);
   
   return sum;
 }
@@ -331,7 +336,7 @@ double fourier_j1_if(x,Ni,Nf,func,param)
 
 void init_workspace_fourier(int N){
   Nzeros=N;
-  workspace=gsl_sum_levin_u_alloc (1+N);
+  //workspace=gsl_sum_levin_u_alloc (1+N);
 }
 
 

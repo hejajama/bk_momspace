@@ -12,6 +12,7 @@
 #include <gsl/gsl_dht.h>
 #include <gsl/gsl_sf_bessel.h>
 #include <gsl/gsl_integration.h>
+#include <gsl/gsl_sum.h>
 #include <cmath>
 extern "C"
 {
@@ -53,13 +54,17 @@ REAL Hankel::Amplitude_r(REAL r, REAL y)
 Hankel::Hankel(Amplitude* amp)
 {
     N=amp;
+    points = 2000;
 
     // Some initialisation stuff -- in principle nothing should be
     // changed here (1000 is the number of zeros of J0(x) that have been
     // encoded in the table in the file fourier.c)
     set_fpu_state();
     //gsl_set_error_handler_off();
-    init_workspace_fourier(2000);
+    init_workspace_fourier(1500);
+    
+    workspace=gsl_sum_levin_u_alloc (1+points);
+    
     set_fourier_precision(1.0e-12,1.0e-12);
        
 }

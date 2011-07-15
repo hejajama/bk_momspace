@@ -36,6 +36,7 @@ enum OUTPUT
 enum MODE
 {
     GENERATE_DATAFILE,      // Solve and print output to one huge file
+    GENERATE_RDATAFILE,     // Save amplitude in coord. space
     GENERATE_PLOTS,         // Print output to different files with constant rapidity
     GENERATE_SINGLE_PLOT,   // Print amplitude at a given rapidity
     GENERATE_SINGLE_RPLOT,  // Print amplitude in r-space at a given rapidity
@@ -80,6 +81,9 @@ bool scale_sat=false;  // Scale k_T with the scaturation scale
 REAL sqrts = 7000;  // Center of mass energy
 REAL alphas_scaling = 1.0;
 
+REAL minr = 1e-6; REAL maxr = 300;
+int rpoints = 100;
+
 METHOD method=BRUTEFORCE;
 
 // Parameters for BruteForceSolver
@@ -99,6 +103,7 @@ CHEBYSHEV_MATRIX cheb_matrix = LOAD;
 std::stringstream infostr;
 
 void GenerateDataFile();
+void GenerateRDataFile();
 void GeneratePlots();
 void LogLogDerivative();
 void SinglePlot();
@@ -127,7 +132,7 @@ int main(int argc, char* argv[])
     {
         cout << "Usage: " << endl;
         cout << "-mode [MODE]: what to do, modes: GENERATE_DATA, GENERATE_PLOTS, SINGLE_PLOT, SINGLE_RPLOT, LOGLOG_DERIVATIVE " << endl;
-        cout << "              SATURATION_SCALE[_R] PT_SPECTRUM PSEUDOY_SPECTRUM UGD" << endl;
+        cout << "              SATURATION_SCALE[_R] PT_SPECTRUM PSEUDOY_SPECTRUM UGD, GENERATE_RDATA" << endl;
         cout << "-method [METHOD]: what method is used to solve BK, methods: BRUTEFORCE, CHEBYSHEV" << endl;
         cout << "-output [prefix]: set output file prefix, filenames are prefix_y[rapidity].dat" << endl;
         cout << "-miny, -maxy: rapidity values to solve" << endl;
@@ -248,6 +253,8 @@ int main(int argc, char* argv[])
         {
             if (string(argv[i+1])=="GENERATE_DATA")
                 mode=GENERATE_DATAFILE;
+            if (string(argv[i+1])=="GENERATE_RDATA")
+                mode = GENERATE_RDATAFILE;
             else if (string(argv[i+1])=="LOGLOG_DERIVATIVE")
                 mode=LOGLOG_DERIVATIVE;
 			else if (string(argv[i+1])=="GENERATE_PLOTS")
@@ -441,6 +448,8 @@ int main(int argc, char* argv[])
 
     if (mode == GENERATE_DATAFILE)
         GenerateDataFile();
+    if (mode == GENERATE_RDATAFILE)
+        GenerateRDataFile();
     else if (mode==GENERATE_PLOTS)
         GeneratePlots();
     else if (mode==LOGLOG_DERIVATIVE)
@@ -537,6 +546,66 @@ void GenerateDataFile()
 }
 
 /*
+ * Generate datafile containing amplitude as a function of r
+ * Format is same as when generating "normal" datafile
+ */
+void GenerateRDataFile()
+{
+    // limits minr, maxr, # of points in variable rpoints
+    std::ofstream output;
+    std::stringstream s; s << file_prefix; s << ".dat";
+    output.open(s.str().c_str());
+    output << infostr.str();
+    cout << "# Saving ampilitude in coord space to file " << s.str() << endl;
+
+    REAL rmultiplier = std::pow(maxr/minr, 1.0/(rpoints-1));
+
+    // Metadata (see README for the syntax)
+    output << "###" << std::scientific << std::setprecision(15) << minr << endl;
+    output << "###" << std::scientific << std::setprecision(15) <<
+        rmultiplier  << endl;
+    output << "###" << rpoints << endl;
+
+    int ypoints = static_cast<int>(maxy/delta_y)+1;
+
+    Hankel transform(N);
+
+    REAL *data = new REAL[rpoints*(ypoints+1)];
+    int ready=0;
+    #pragma omp parallel for
+    for (int yind=0; yind <= ypoints; yind++)
+    {
+        REAL tmpy = maxy/(REAL)(ypoints) * yind;			
+        for (int i=0; i<rpoints; i++)
+		{
+			REAL tmpr = minr*std::pow(rmultiplier, i);
+            REAL amp =  transform.Amplitude_r(tmpr, tmpy);
+			//output << std::scientific << std::setprecision(15) <<
+            //     amp << endl;
+            data[rpoints*yind+i]=amp;
+            #pragma omp critical
+            {
+                ready++;
+                if (ready%50==0)
+                    cout <<"# " << ready << " / " << rpoints*(ypoints+1) << endl;
+            }
+        }
+    }
+
+    for (int yind=0; yind<=ypoints; yind++)
+    {
+        REAL tmpy = maxy/(REAL)(ypoints) * yind;
+        output << "###" << tmpy << endl;
+        for (int i=0; i<rpoints; i++)
+        {
+            output << std::scientific << std::setprecision(15)
+                << data[rpoints*yind+i] << endl;
+        }
+    }
+    output.close();
+}
+
+/*
  * LogLog-derivative
  * Calculates d ln(N(k^2)) / d ln(k^2) at given y
  * Doesn't depend on the solver used
@@ -594,9 +663,9 @@ void SinglePlotR()
 {
     cout << "# y=" << y << ", ic=" << N->InitialConditionStr() << endl;
     cout << "# r [GeV^(-1)]     N(r)" << endl;
-    Hankel transform(N);
     REAL minr=1e-6; REAL maxr=5e2; int rpoints=80;
     REAL mult = std::pow(maxr/minr, 1.0/static_cast<REAL>(rpoints));
+    Hankel transform(N);
     #pragma omp parallel for
     for (int i=0; i<=rpoints; i++)
     {

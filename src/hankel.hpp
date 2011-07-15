@@ -12,7 +12,8 @@
 
 #include "config.hpp"
 #include "amplitude.hpp"
-#include <gsl/gsl_dht.h>
+#include <gsl/gsl_integration.h>
+#include <gsl/gsl_sum.h>
 #include <cmath>
 
 class Hankel
@@ -26,7 +27,9 @@ class Hankel
         Amplitude* N;
         REAL *sample;
         REAL *transformed;
-        gsl_dht* dht;
+        gsl_sum_levin_u_workspace *workspace;
+        static const double epsilon1=1.0e-12;
+        static const double epsilon=1.0e-12;
         REAL y;
 
     
