@@ -81,8 +81,8 @@ bool scale_sat=false;  // Scale k_T with the scaturation scale
 REAL sqrts = 7000;  // Center of mass energy
 REAL alphas_scaling = 1.0;
 
-REAL minr = 1e-6; REAL maxr = 300;
-int rpoints = 100;
+REAL minr = 5e-5; REAL maxr = 100;
+int rpoints = 500;
 
 METHOD method=BRUTEFORCE;
 
@@ -633,8 +633,8 @@ void LogLogDerivative()
 void SinglePlot()
 {
     cout << "# y=" << y << ", ic=" << N->InitialConditionStr() << endl;
-    cout << "# Saturation scale: k_T:" << endl;
-    cout << "### " << N->SaturationScale(y) << endl;
+    //cout << "# Saturation scale: k_T:" << endl;
+    //cout << "### " << N->SaturationScale(y) << endl;
     cout << "# N(k_T)=" << SATSCALE_N << ", k_T:" << endl;
     cout << "###" << N->SolveKtsqr(y, SATSCALE_N) << endl;
     cout << "# ktsqr amplitude initial_condition bspline_amplitude" << endl;

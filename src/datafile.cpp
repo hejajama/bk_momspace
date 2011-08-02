@@ -13,6 +13,7 @@ using std::ifstream;
 using std::getline;
 using std::stringstream;
 
+///FIXME: Doesn't save the amplitude at largest saved rapidity!
 DataFile::DataFile(string fname)
 {
     filename=fname;

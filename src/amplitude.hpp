@@ -113,6 +113,7 @@ class Amplitude
         std::vector< std::vector<REAL> > ln_n;
 
         std::vector<REAL> ktsqrvals;
+        std::vector<REAL> ktvals;
         std::vector<REAL> lnktsqrvals;
         std::vector<REAL> yvals;
 

@@ -62,8 +62,7 @@ Hankel::Hankel(Amplitude* amp)
     set_fpu_state();
     //gsl_set_error_handler_off();
     init_workspace_fourier(1500);
-    
-    workspace=gsl_sum_levin_u_alloc (1+points);
+
     
     set_fourier_precision(1.0e-12,1.0e-12);
        

@@ -506,6 +506,7 @@ REAL BruteForceSolver::InterpolateN(REAL lnktsqr, const REAL* array, bool bsplin
 {
     if (lnktsqr >= lnktsqrvals[KtsqrPoints()-1]) return array[KtsqrPoints()-1];
     if (lnktsqr <= lnktsqrvals[0]) return array[0];
+    REAL kt = std::exp(0.5*lnktsqr);
         
     int ktsqrind = FindIndex(lnktsqr, lnktsqrvals);
     if (ktsqrind < 0)
@@ -539,7 +540,7 @@ REAL BruteForceSolver::InterpolateN(REAL lnktsqr, const REAL* array, bool bsplin
     REAL *tmpxarray = new REAL[interpo_points];
     for (int i=interpolation_start; i<= interpolation_end; i++)
     {
-		tmpxarray[i-interpolation_start]=lnktsqrvals[i];
+		tmpxarray[i-interpolation_start]=ktvals[i];
         tmparray[i-interpolation_start] = array[i];	
     }
 
@@ -547,7 +548,7 @@ REAL BruteForceSolver::InterpolateN(REAL lnktsqr, const REAL* array, bool bsplin
     if (bspline)
         interp.SetMethod(INTERPOLATE_BSPLINE);
     interp.Initialize();
-    REAL res = interp.Evaluate(lnktsqr);
+    REAL res = interp.Evaluate(kt);
 
     delete[] tmparray;
     delete[] tmpxarray;

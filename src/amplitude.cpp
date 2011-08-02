@@ -77,6 +77,7 @@ void Amplitude::Initialize()
     {
         ktsqrvals.push_back(minktsqr * std::pow(ktsqr_multiplier, (int)i) );
         lnktsqrvals.push_back(std::log(ktsqrvals[i]));
+        ktvals.push_back(std::sqrt(ktsqrvals[i]));
     }
 
     yvals.push_back(0.0);
@@ -121,6 +122,9 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
     }
     else
         ktsqrind = FindIndex(lnktsqr, lnktsqrvals);
+
+    REAL kt = std::sqrt(ktsqr);
+    if (kt < ktvals[0]) kt=ktvals[0]*1.0000001;
     
     // Now we always have MinKtsqr() < ktsqr < MaxKtsqr() => interpolation works
 
@@ -166,17 +170,18 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
     REAL *tmpxarray = new REAL[interpo_points];
     for (int i=interpolation_start; i<= interpolation_end; i++)
     {
-		tmpxarray[i-interpolation_start]=lnktsqrvals[i];
+		tmpxarray[i-interpolation_start]=ktvals[i];
 
-        tmparray[i-interpolation_start] = ln_n[yind][i];
+        REAL y0 = std::exp(ln_n[yind][i]);
+        tmparray[i-interpolation_start] = y0;
 
         // Interpolate in y if possible
 		if (yind < yvals.size()-1 )
         {
-            tmparray[i-interpolation_start]=ln_n[yind][i] 
-                + (y - yvals[yind]) * (ln_n[yind+1][i] - ln_n[yind][i])
+            tmparray[i-interpolation_start]=y0
+                + (y - yvals[yind]) * (std::exp(ln_n[yind+1][i]) - y0)
                 / (yvals[yind+1]-yvals[yind]);
-		} 
+		}
     }
     
     Interpolator interp(tmpxarray, tmparray, interpo_points);
@@ -186,12 +191,15 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
     REAL res;
     if (derivative)
     {
+        res=interp.Derivative(kt)/(2.0*kt);
+        
         // Derivative returns d ln(N) / d ln k^2 = k^2/N dN/dk^2
-        res = interp.Derivative(lnktsqr)
-            * std::exp(interp.Evaluate(lnktsqr)) / ktsqr;
+        //res = interp.Derivative(lnktsqr)
+        //    * std::exp(interp.Evaluate(lnktsqr)) / ktsqr;
     }
     else
-        res = std::exp( interp.Evaluate(lnktsqr) ) ; 
+        res = interp.Evaluate(kt);
+        //res = std::exp( interp.Evaluate(lnktsqr) ) ; 
 
     //if (! (res<1e99 and res>10) )
     //    cerr << "O-ou\n";

@@ -27,7 +27,6 @@ class Hankel
         Amplitude* N;
         REAL *sample;
         REAL *transformed;
-        gsl_sum_levin_u_workspace *workspace;
         static const double epsilon1=1.0e-12;
         static const double epsilon=1.0e-12;
         REAL y;
