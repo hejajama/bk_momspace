@@ -50,6 +50,7 @@ Amplitude::Amplitude()
 void Amplitude::Clear()
 {
 	ktsqrvals.clear();
+    ktvals.clear();
     lnktsqrvals.clear();
 	yvals.clear();
 
@@ -287,7 +288,8 @@ REAL Amplitude::LogLogDerivative(REAL ktsqr, REAL rapidity)
     */
 
     // f'(x) \approx [ f(x+h) - f(x-h) ] / 2h + o(h^2)
-    SetInterpolationPoints(INTERPOLATION_POINTS_DER);
+    //SetInterpolationPoints(INTERPOLATION_POINTS_DER);
+    SetInterpolationPoints(150);
 
     // h=lnktsqr[ind+1]-lnktsqr[ind] = lnktsqr[ind] - lnktsqr[ind-1]
     REAL lnktsqr1 = std::log(ktsqrvals[ktsqrind-1]);
