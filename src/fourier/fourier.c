@@ -46,28 +46,36 @@ typedef struct {
 
 static int Nzeros;
 //static gsl_sum_levin_u_workspace *workspace;
-static double epsilon1=1.0e-12;
-static double epsilon=1.0e-12;
+static double epsilon1=1.0e-7; //1.0e-12;
+static double epsilon=1.0e-7; //1.0e-12;
 
 
 /* Table with the first 1000 zeros of J0(x) */
 
-//double J0zero[2001]={0.0,\ ...
+/* double J0zero[2001]={0.0,\ ... */
 #include "besselj0zero.h"
 
 
 
-//double J1zero[1001]={0.0,\ ...
+/* double J1zero[1001]={0.0,\ ... */
 #include "besselj1zero.h"
 
 
-// Generic integration routine in an interval
+/* Generic integration routine in an interval */
 
 double integrate(double a,double b,gsl_function F,\
 		 gsl_integration_workspace *gsl_wksp){
   double error,term_n;
 
-  gsl_integration_qag(&F,a,b,0.0,epsilon1,4000,6,gsl_wksp,&term_n,&error);
+  // Error handling added by H.M.
+  int status
+   = gsl_integration_qag(&F,a,b,0.0,epsilon1,4000,6,gsl_wksp,&term_n,&error);
+
+  if (status && fabs(term_n)>epsilon1)
+  {
+      fprintf(stderr, "Integration failed at fourier.c:integrate interval "
+       " [%f, %f], result %E, relerr %E\n", a,b,term_n, fabs(error/term_n)); 
+  }
 
   return term_n;
 }
@@ -79,7 +87,11 @@ double fourier_J0_int(double k,void *param){
   fourier_int_data *dt=(fourier_int_data*)param;
 
 #ifndef FORTRAN
-  return j0(k*(dt->x))*(dt->function)(k,dt->params);
+  /* changed by H.M. */
+  double result = j0(k*(dt->x))*(dt->function)(k,dt->params);
+  if (isinf(result) || isnan(result))
+    fprintf(stderr, "Inf/nan result %f at k=%f\n", result, k);
+  return result;
 #else
   return j0(k*(dt->x))*(dt->function)(&k,dt->params);
 #endif
@@ -114,7 +126,7 @@ double fourier_j_i(x,Ni,func,param,n)
   int N;
   int dN=20;
   int precision_OK=0;
-  int j;
+  int i,j;
   fourier_int_data params;
   gsl_sum_levin_u_workspace *workspace=gsl_sum_levin_u_alloc (1+Nzeros);
   gsl_integration_workspace *gsl_wksp=gsl_integration_workspace_alloc(4000);
@@ -144,15 +156,33 @@ double fourier_j_i(x,Ni,func,param,n)
   do {
     for(;j<N+Ni;j++){
       tmp[j-Ni]=integrate(zeros[j]/x,zeros[j+1]/x,F,gsl_wksp);
+
+      /* All terms given to gls_sum_levin_u_accel must be nonzero.
+       * If we just got 0, most likely all the other terms in the series
+       * are zero (within the numerical accuracy), thus compute the sum of
+       * the nonzero terms and return it.
+       * Added by H.M. */
+       if (tmp[j-Ni]==0)
+       {
+         sum=0;
+         for (i=0; i<=j-Ni; i++)
+           sum += tmp[i];
+        gsl_integration_workspace_free(gsl_wksp);
+        free(tmp);
+        gsl_sum_levin_u_free(workspace);
+        return sum;
+       }
     }
     gsl_sum_levin_u_accel(tmp,N,workspace,&sum,&error);
     if (workspace->terms_used<N) {
       precision_OK=1;
-    } else {
+    }
+    else {
       if (fabs(error/sum)<=epsilon) {
-	precision_OK=1;
-      } else {
-	N+=dN;
+	    precision_OK=1;
+      }
+      else {
+	    N+=dN;
       }
     }
   } while((precision_OK==0)&&(N<=Nzeros));
@@ -266,7 +296,6 @@ double fourier_j_if(x,Ni,Nf,func,param,n)
   
   // We have to sum a finite number of terms ==> we must not use sum
   // acceleration algorithms !!
-  
   for(j=Ni;j<Nf;j++){
     sum+=integrate(zeros[j]/x,zeros[j+1]/x,F,gsl_wksp);
   }
