@@ -19,7 +19,7 @@
 #include <gsl/gsl_multifit.h>
 #include <gsl/gsl_min.h>
 #include <gsl/gsl_roots.h>
-#include "interpolation.hpp"
+#include <tools/interpolation.hpp>
 #include "hankel.hpp"
 
 
@@ -193,34 +193,13 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
     if (derivative)
     {
         res=interp.Derivative(kt)/(2.0*kt);
-        
-        // Derivative returns d ln(N) / d ln k^2 = k^2/N dN/dk^2
-        //res = interp.Derivative(lnktsqr)
-        //    * std::exp(interp.Evaluate(lnktsqr)) / ktsqr;
     }
     else
         res = interp.Evaluate(kt);
-        //res = std::exp( interp.Evaluate(lnktsqr) ) ; 
-
-    //if (! (res<1e99 and res>10) )
-    //    cerr << "O-ou\n";
 
     delete[] tmparray;
     delete[] tmpxarray;
     return res;
-    /*
-    REAL linear = n[ktsqrind][yind] +
-        (ktsqr - ktsqrvals[ktsqrind]) *
-            (n[ktsqrind+1][yind] - n[ktsqrind][yind]) / (ktsqrvals[ktsqrind+1] - ktsqrvals[ktsqrind]);
-    if (n[ktsqrind][yind+1]>-eps)   // We can also interpolate y
-        linear += (y - yvals[yind]) * (n[ktsqrind][yind+1] - n[ktsqrind][yind]) / (yvals[yind+1]-yvals[yind]);
-    
-
-    if (std::abs(res-linear)/res > 0.5 and linear>eps)
-		cerr << "At ktsqr=" << ktsqr << ", y=" << y << " reldifference " << std::abs(res-linear)/res << endl;
-    return linear;
-    */
-    //return res;
     
 
 }

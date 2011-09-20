@@ -5,7 +5,7 @@
 
 #include "amplitude.hpp"
 #include "datafile.hpp"
-#include "interpolation.hpp"
+#include <tools/interpolation.hpp>
 #include "solver_force.hpp"
 #include <algorithm>
 #include <vector>
@@ -14,7 +14,7 @@
 #include <gsl/gsl_sf_bessel.h>
 #include <gsl/gsl_spline.h>
 #include <gsl/gsl_errno.h>
-#include <gsl/gsl_odeiv2.h> // Requires GSL 1.15
+#include <gsl/gsl_odeiv.h>
 #include <cmath>
 using std::abs;
 
@@ -235,19 +235,18 @@ const REAL MINSTEP=0.005;
 void BruteForceSolver::Solve(REAL maxy)
 {
 
-    int largedifference=0;
     REAL Y=0;   // We are allways solved amplitude up to Y
     int yind=0; // yvals[yind]=Y always
     REAL nexty=delta_y/4;   // smaller step size a the beginning
 
     // **** used in GSL solver *****
-    const gsl_odeiv2_step_type * T = gsl_odeiv2_step_rkf45;
+    const gsl_odeiv_step_type * T = gsl_odeiv_step_rkf45;
 
-    gsl_odeiv2_step * s    = gsl_odeiv2_step_alloc (T, KtsqrPoints());
-    gsl_odeiv2_control * c = gsl_odeiv2_control_y_new (0.0, 0.05);    //abserr relerr
-    gsl_odeiv2_evolve * e  = gsl_odeiv2_evolve_alloc (KtsqrPoints());
+    gsl_odeiv_step * s    = gsl_odeiv_step_alloc (T, KtsqrPoints());
+    gsl_odeiv_control * c = gsl_odeiv_control_y_new (0.0, 0.01);    //abserr relerr
+    gsl_odeiv_evolve * e  = gsl_odeiv_evolve_alloc (KtsqrPoints());
     EvolutionHelper help; help.N=this;
-    gsl_odeiv2_system sys = {Evolve, NULL, KtsqrPoints(), &help};
+    gsl_odeiv_system sys = {Evolve, NULL, KtsqrPoints(), &help};
     REAL Yi=0;
     REAL h = delta_y;   // Original step size
     ///////
@@ -279,10 +278,9 @@ void BruteForceSolver::Solve(REAL maxy)
         {
             Yi = nexty;
             // gsl_odeiv_evolve_apply increases Y according to the step size
-            // why gsl_odeiv_evolve_apply doesn't set Y=Y_i at the end?
             while (Y<Yi)
             {
-                int status = gsl_odeiv2_evolve_apply(e, c, s, &sys,
+                int status = gsl_odeiv_evolve_apply(e, c, s, &sys,
                         &Y, Yi, &h, amplitude);
                 if (status != GSL_SUCCESS) {
                     cerr << "Error in gsl_odeiv_evolve_apply at " << LINEINFO
@@ -297,7 +295,6 @@ void BruteForceSolver::Solve(REAL maxy)
             for (int ktsqrind = 0; ktsqrind < KtsqrPoints(); ktsqrind++)
             {
                 AddDataPoint(ktsqrind, yind+1, amplitude[ktsqrind], 0.0);
-                //n[ktsqrind][yind] = amplitude[ktsqrind];
             }
 
             nexty += delta_y;
@@ -322,12 +319,13 @@ void BruteForceSolver::Solve(REAL maxy)
             ///NOTICE: Now we have probably different \delta_y
             if (adams_method==true)
             {
+                cerr <<"Adam's method is not supported!" << endl;
+                /*
                 REAL old_der = derivatives[yind-1][ktsqrind];
                 REAL adamsn = std::exp(ln_n[yind][ktsqrind] ) + dy*tmpder
                     + 1.0/2.0*dy*( tmpder - old_der);
-
-                //cout << "reldiff at k=" << ktsqrvals[ktsqrind] <<": " << std::abs((newn-adamsn)/newn) << endl;
                 newn = adamsn;
+                */
             }
 
             // Adaptive step size (quite stupid one)
@@ -340,11 +338,6 @@ void BruteForceSolver::Solve(REAL maxy)
                 ok=false;
                 continue;
             }
-
-            /*if( abs(newn - std::exp(ln_n[yind][ktsqrind]) ) / std::exp(ln_n[yind][ktsqrind]) > 0.2)
-            {
-                largedifference++;
-            }*/
 
             amplitude[ktsqrind]=newn;
             ders[ktsqrind] = tmpder;
@@ -370,49 +363,10 @@ void BruteForceSolver::Solve(REAL maxy)
         nexty += step;
         yind++;
     }while(Y < maxy);
-        
 
-        
-    cout << endl << "#" << largedifference << " too large differences" << endl;
-    // Again
-    /*
-    if (averages>0) cerr << "Averagements are not well tested..." << endl;
-    for (int avg=0; avg<averages; avg++)
-    {
-            
-        largedifference=0;
-        for (int yind=1; yind<maxyind-1; yind++)
-        {
-            //cout << "Solving for y=" << yvals[yind] << endl;
-            // Solve N(y+DELTA_Y, kt) for every kt
-            ///TODO: Different iterations are not independent, but the difference
-            /// caused by different order of execution should be higher order?
-    #pragma omp parallel for
-            for (int ktsqrind=0; ktsqrind<KtsqrPoints()-1; ktsqrind++)
-            {
-                REAL tmpkt = ktsqrvals[ktsqrind];
-                REAL tmpder = RapidityDerivative(tmpkt, yvals[yind]);
-                REAL dy = yvals[yind]-yvals[yind-1];
-                REAL newn = n[ktsqrind][yind-1] + dy*0.5*(tmpder+derivatives[ktsqrind][yind-1]);
-
-                if( abs(newn - n[ktsqrind][yind-1])/n[ktsqrind][yind-1] > 0.02)
-                {
-                    largedifference++;
-                }
-
-                AddDataPoint(ktsqrind, yind, newn, 0.5*(tmpder + derivatives[ktsqrind][yind-1]));
-
-                    
-            }
-        }
-        cout << endl << "#" << largedifference << " out of " << maxyind * (KtsqrPoints()-1)
-            << " too large differences" << endl;
-    } 
-    */
-
-    gsl_odeiv2_evolve_free(e);
-    gsl_odeiv2_control_free(c);
-    gsl_odeiv2_step_free(s);
+    gsl_odeiv_evolve_free(e);
+    gsl_odeiv_control_free(c);
+    gsl_odeiv_step_free(s);
     delete[] amplitude;
     delete[] ders;
 }

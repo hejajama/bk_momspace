@@ -6,7 +6,7 @@
 #ifndef _DATAFILE_H
 #define _DATAFILE_H
 
-#include "tools.hpp"
+#include <tools/tools.hpp>
 #include "config.hpp"
 #include <sstream>
 #include <vector>

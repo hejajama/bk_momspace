@@ -5,7 +5,7 @@
 
 #include "spectrum.hpp"
 #include "amplitude.hpp"
-#include "tools.hpp"
+#include <tools/tools.hpp>
 #include <cmath>
 #include <algorithm>
 #include <gsl/gsl_integration.h>

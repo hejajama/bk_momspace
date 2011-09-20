@@ -155,7 +155,7 @@ class Amplitude
 
 const REAL DEFAULT_DELTA_Y=0.1;
 const unsigned int DEFAULT_MAXY=50;
-const REAL DEFAULT_KTSQR_MULTIPLIER = 1.01;  // ktsqr_{i+1} = ktsqr_i*KTSQR_MULTIPLIER
+const REAL DEFAULT_KTSQR_MULTIPLIER = 1.15;  // ktsqr_{i+1} = ktsqr_i*KTSQR_MULTIPLIER
 //const REAL DEFAULT_KTSQR_MULTIPLIER = 1.05;
 const REAL DEFAULT_MINKTSQR = 1e-8; // orig: 1e-8
 const REAL DEFAULT_MAXKTSQR = 1e40;
@@ -166,7 +166,7 @@ const REAL MINLN_N = -999;  // ln 0 = -\infty, so we need some finite lower cut
 
 const REAL KTSQRINTACCURACY = 0.005;  //0.001;
 const int KTSQRINTITERATIONS = 5000; // May be possible to use smaller one
-const int INTERPOLATION_POINTS = 8;
+const int INTERPOLATION_POINTS = 15;
 const int INTERPOLATION_POINTS_DER=50;  // 50 good if 2000 ktsqrpoints, 100 for 5000
 
 const REAL Q0SQR = 0.24; /*200; */    // 0.24 GeV^2 arXiv:0902.1112

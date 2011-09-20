@@ -9,10 +9,10 @@
 #include "solver_force.hpp"
 #include "solver_chebyshev.hpp"
 #include "chebyshev_amplitude.hpp"
-#include "tools.hpp"
+#include <tools/tools.hpp>  // #include "tools.hpp"
 #include "chebyshev.hpp"
 #include "hankel.hpp"
-#include "interpolation.hpp"
+#include <tools/interpolation.hpp>
 #include "spectrum.hpp"
 #include <gsl/gsl_errno.h>
 #include <cmath>
@@ -603,6 +603,7 @@ void GenerateRDataFile()
         }
     }
     output.close();
+    delete[] data;
 }
 
 /*

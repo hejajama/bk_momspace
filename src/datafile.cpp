@@ -3,7 +3,7 @@
  * Heikki Mäntysaari <heikki.mantysaari@jyu.fi>, 2011
  */
 
-#include "tools.hpp"
+#include <tools/tools.hpp>
 #include "config.hpp"
 #include "datafile.hpp"
 #include "amplitude.hpp"
