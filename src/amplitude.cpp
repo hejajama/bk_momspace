@@ -163,7 +163,7 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
     // First data point is sometimes somehow off, so don't use spline
     // with that
     ///TODO: Why?
-    if (ktsqrind>0 and interpolation_start==0) { interpolation_start=1; }
+    if (ktsqrind>1 and interpolation_start==0) { interpolation_start=1; }
     
 	int interpo_points = interpolation_end - interpolation_start+1;
     
@@ -620,7 +620,8 @@ string Amplitude::RunningCouplingStr()
     switch (running_coupling)
     {
     case CONSTANT:
-        return "Constant";
+        s << "Constant, ALPHABAR_s=" << ALPHABAR_s << " ";
+        break;
     case PARENT_DIPOLE:
         s << "Parent dipole";
         break;
@@ -631,7 +632,8 @@ string Amplitude::RunningCouplingStr()
         s << "MAXK";
         break;
     }
-    s << " \\alpha_s scaling factor: " << alphas_scaling;
+    if (running_coupling!=CONSTANT)
+        s << " \\alpha_s scaling factor: " << alphas_scaling;
     return s.str();
 }
 

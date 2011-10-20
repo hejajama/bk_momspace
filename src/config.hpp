@@ -30,7 +30,7 @@ const REAL e = sqrt(4.0*M_PI*ALPHA_e);
 // Berger&Stasto 1010.0671: 0.3
 // Fit to HERA: 0.7 0902.1112
 const REAL MAXALPHA = 0.7;  
-const REAL ALPHAS = 0.2;       // \alpha_s if RC=constant
+const REAL ALPHABAR_s = 0.2;       // \alpha_s if RC=constant
 
 // Other constants
 

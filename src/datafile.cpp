@@ -85,6 +85,8 @@ DataFile::DataFile(string fname)
         // Ok, so this a new amplitude value
         tmpvec.push_back(StrToReal(line));
     }
+    // Add last entry
+    data.push_back(tmpvec);
 
     if (data[0].size() != ktsqrpoints)
     {

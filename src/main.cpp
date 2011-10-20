@@ -524,9 +524,10 @@ void GenerateDataFile()
     output << "###" << std::scientific << std::setprecision(15) << N->MinKtsqr() << endl;
     output << "###" << std::scientific << std::setprecision(15) << N->KtsqrMultiplier() << endl;
     output << "###" << ktsqrpoints << endl;
+
+    int ystep=1;
     
-    
-    for (unsigned int yind=0; yind <= N->YPoints(); yind++)
+    for (unsigned int yind=0; yind <= N->YPoints(); )
     {
         //REAL tmpy = miny + (maxy-miny)/(REAL)(y_points) * yind;
         REAL tmpy = N->Yval(yind);
@@ -541,6 +542,10 @@ void GenerateDataFile()
 			REAL tmpktsqr = minktsqr*std::pow(N->KtsqrMultiplier(), i);
 			output << std::scientific << std::setprecision(15) << N->N(tmpktsqr, tmpy) << endl;
         }
+
+        // Don't save too many rapidity values
+        yind=yind+1;
+        while (N->Yval(yind)-tmpy < 0.05 and yind <= N->YPoints()) yind++;
     }
     output.close();
 }

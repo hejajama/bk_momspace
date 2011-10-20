@@ -145,9 +145,20 @@ REAL inthelperf_bkmom_constraint(REAL lnktsqr, void* p)
     else if (par->N->RunningCoupling() == MINK)
         result *= Alphabar_s(std::min(ktsqr, parktsqr), par->N->AlphasScaling());
 
-    if (isnan(result))
-        cerr << "Integrand is NaN at lnktsqr=" << lnktsqr << endl;
-
+    if (isnan(result) or isinf(result))
+    {
+        cerr << "Integrand is " << result << " at " << LINEINFO <<", ktsqr=" <<ktsqr <<
+        " n0 " << n0 << " parktsqr " << parktsqr << " y " << par->y << " real_n ";
+        if (par->lnktsqr > lnktsqr)
+            cerr << "local " << par->N->N(ktsqr, par->y);
+        else
+             cerr << "nonlocal " << par->N->N(ktsqr, par->y - (lnktsqr - par->lnktsqr))
+            << " dy " << lnktsqr-par->lnktsqr;
+        cerr << endl;
+        result=0;
+        exit(1);
+    }
+    
     return result;
 }
 
@@ -174,7 +185,8 @@ REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y, const REAL* array)
     int_helper.params=&inthelp;
 
     REAL result, abserr;
-    int ktsqriter = KTSQRINTITERATIONS;
+    //int ktsqriter = KTSQRINTITERATIONS;
+    int ktsqriter = KtsqrPoints();
     gsl_integration_workspace *workspace 
      = gsl_integration_workspace_alloc(ktsqriter);
 
@@ -184,12 +196,12 @@ REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y, const REAL* array)
     int status;
     status=gsl_integration_qag(&int_helper, minlnktsqr,
             maxlnktsqr, 0, KTSQRINTACCURACY, 
-            ktsqriter, GSL_INTEG_GAUSS21, workspace, &result, &abserr);
+            ktsqriter, GSL_INTEG_GAUSS41, workspace, &result, &abserr);
     
     gsl_integration_workspace_free(workspace);
     if (status) { cerr << "Error " << status << " at " << LINEINFO << ":"
         << " ktsqr=" << ktsqr <<", y=" << y << " result=" << result << ", abserror=" <<
-        abserr << " relerror: " << abserr/result << endl; exit(1); }
+        abserr << " relerror: " << abserr/result << endl; }
 
     // Nonlinear term
     // if rc is {MIN,MAX}k, then result is already multiplied by alpha_s
@@ -199,7 +211,7 @@ REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y, const REAL* array)
         result -= SQR(N(ktsqr, y));
 
     if (RunningCoupling()==CONSTANT)
-        result*=ALPHAS;
+        result*=ALPHABAR_s;
     if (RunningCoupling()==PARENT_DIPOLE)
         result *= Alphabar_s(ktsqr, alphas_scaling);
     
@@ -208,7 +220,6 @@ REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y, const REAL* array)
 /*
  * GSL ODEIV evolution
  * Returns RapidityDerivative for every ktsqr in vector
- * TODO: Doesn't work, as RapidityDerivative doesn't use amplitud[] array
  *
  */
 struct EvolutionHelper
@@ -217,11 +228,7 @@ struct EvolutionHelper
 };
 int Evolve(REAL y, const REAL amplitude[], REAL dydt[], void *params)
 {
-    cout << "Evolving with y=" << y << endl;
     EvolutionHelper* helper = (EvolutionHelper*)params;
-   // Actually we don't need amplitude[] as it only contains
-   // elements N[ktsqrind][yind], but GSL uses it to determine whether
-   // the volution is accurate 
    #pragma omp parallel for
     for( int i=0 ; i<helper->N->KtsqrPoints() ; i++) {
         REAL res = helper->N->RapidityDerivative(helper->N->Ktsqrval(i), y, amplitude);
@@ -230,7 +237,8 @@ int Evolve(REAL y, const REAL amplitude[], REAL dydt[], void *params)
    return GSL_SUCCESS;
 }
 
-const REAL MINSTEP=0.005;
+const REAL MINSTEP=0.01;
+//const REAL MINSTEP=0.001;
 // Solve BK, lowest order
 void BruteForceSolver::Solve(REAL maxy)
 {
@@ -287,10 +295,10 @@ void BruteForceSolver::Solve(REAL maxy)
                         << ": " << gsl_strerror(status) << " (" << status << ")"
                         << " y=" << Y << ", h=" << h << endl;
                 }
-                cout << "Evolved up to " << Y << "/" << Yi << ", h=" << h << endl;
+                //cout << "Evolved up to " << Y << "/" << Yi << ", h=" << h << endl;
             } // end while (useless loop?)
-            cout << "Solved yind " << yind << " to Y=" << Y << " with step size "
-                    << h << endl;
+            //cout << "Solved yind " << yind << " to Y=" << Y << " with step size "
+            //        << h << endl;
             AddRapidity(nexty); // During the evolution Y has evolved up to nexty  
             for (int ktsqrind = 0; ktsqrind < KtsqrPoints(); ktsqrind++)
             {
@@ -313,34 +321,24 @@ void BruteForceSolver::Solve(REAL maxy)
             REAL oldn = std::exp(ln_n[yind][ktsqrind]);
             REAL newn= oldn + dy*tmpder;
 
-            // Adams method: apprximate derivative as a 2nd order polynomial
-            // Y_{i+1} = y_i + hf_i + 1/2 h (f_i - f_{i-1} )
-            // We can use this only for yind>1
-            ///NOTICE: Now we have probably different \delta_y
-            if (adams_method==true)
-            {
-                cerr <<"Adam's method is not supported!" << endl;
-                /*
-                REAL old_der = derivatives[yind-1][ktsqrind];
-                REAL adamsn = std::exp(ln_n[yind][ktsqrind] ) + dy*tmpder
-                    + 1.0/2.0*dy*( tmpder - old_der);
-                newn = adamsn;
-                */
-            }
-
             // Adaptive step size (quite stupid one)
             // If reldiff > 0.1 and absdiff > 1e-5 then use smaller step size
-            if (std::abs(dy*tmpder) > 1e-3 and std::abs(dy*tmpder/oldn > 0.05)
-                and (nexty-Y)*2.0/3.0 > MINSTEP)
+            //if (std::abs(dy*tmpder) > 1e-3 and std::abs(dy*tmpder/oldn > 0.01)
+            //    and (nexty-Y)*2.0/3.0 > MINSTEP)
+            #pragma omp critical
             {
-                nexty = Y + (nexty-Y)*2.0/3.0;
-                cout << "Taking smaller step size " <<nexty-Y <<". ";
-                ok=false;
-                continue;
+                if (ok==true and std::abs(dy*tmpder/oldn)>0.01 and (nexty-Y)*2.0/3.0 > MINSTEP)
+                {
+                    nexty = Y + (nexty-Y)*2.0/3.0;
+                    cout << "Taking smaller step size " <<nexty-Y <<". ";
+                    ok=false;
+                }
+                else
+                {
+                    amplitude[ktsqrind]=newn;
+                    ders[ktsqrind] = tmpder;
+                }
             }
-
-            amplitude[ktsqrind]=newn;
-            ders[ktsqrind] = tmpder;
         }
 
         if (!ok)
@@ -351,6 +349,11 @@ void BruteForceSolver::Solve(REAL maxy)
         REAL step = nexty-Y;
         for (uint i=0; i<KtsqrPoints(); i++)
         {
+            if (i+1<KtsqrPoints())
+            {
+                if (amplitude[i+1] > amplitude[i])
+                cerr << "Amplitude increases as k increases!" << endl;
+            }
             AddDataPoint(i, yind+1, amplitude[i], ders[i] );
         }
         cout << "Solved using y=" << nexty << " step " << step << endl;
@@ -380,72 +383,7 @@ void BruteForceSolver::Solve(REAL maxy)
  */
 void BruteForceSolver::InitializeAdamsMethod()
 {
-    cerr << "TODO at " << LINEINFO << ": adam's method is not impelmented with "
-    << "tabulated ln_n" << endl;
-    /*
-    n.clear();
-    REAL y = yvals[1];
-    yvals.clear();
-    derivatives.clear();
-
-    const int SMALLSTEPS = 10;
-
-    for (uint i=0; i<=SMALLSTEPS; i++) // 10 steps to y=yvals[1]
-    {
-        yvals.push_back(y/static_cast<REAL>(SMALLSTEPS)*static_cast<REAL>(i));
-    }
-
-    for (uint i=0; i<=KtsqrPoints(); i++)   // Intialize every kt
-    {
-        std::vector<REAL> tmpvec;
-        std::vector<REAL> tmpdervec;
-
-        // y=0 initial condition
-        tmpvec.push_back(InitialCondition( ktsqrvals[i] ));
-        tmpdervec.push_back(0.0);
-        for (unsigned int j=1; j<=YPoints(); j++)
-        {
-            tmpvec.push_back(0.0);
-            tmpdervec.push_back(0.0);
-        }
-        n.push_back(tmpvec);
-        derivatives.push_back(tmpdervec);
-    }
-
-    for (int yind=1; yind<=SMALLSTEPS; yind++)
-    {
-        cout << "Solving for y=" << yvals[yind] << endl;
-        // Solve N(y+DELTA_Y, kt) for every kt
-        #pragma omp parallel for
-        for (int ktsqrind=0; ktsqrind<KtsqrPoints(); ktsqrind++)
-        {
-            REAL tmpkt = ktsqrvals[ktsqrind];
-            REAL dy = yvals[yind]-yvals[yind-1];
-            REAL tmpder = RapidityDerivative(tmpkt, yvals[yind-1]);
-            REAL newn=n[ktsqrind][yind-1] + dy*tmpder;
-            AddDataPoint(ktsqrind, yind, newn, tmpder );
-        }
-    }
-
-    cout << " Amplitude at y=" << y << " solved using smaller step size, "
-        << "starting to use larger step size and Adams' method." << endl;
-
-    std::vector<REAL> amp; std::vector<REAL> der_y0, der_y1;
-    for (uint i=0; i<=KtsqrPoints(); i++)
-    {
-        amp.push_back(n[i][SMALLSTEPS]);
-        der_y0.push_back( derivatives[i][0] );
-    }
-
-    Initialize();
-
-    for (uint i=0; i<=KtsqrPoints(); i++)
-    {
-        derivatives[i][0] = der_y0[i];
-        n[i][1] = amp[i];
-    }
-    */
-    
+    cerr << "Adam's method not implemented!" << endl;
 }
 
 /*
