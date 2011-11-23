@@ -109,8 +109,8 @@ class Amplitude
 
         void AddRapidity(REAL y);   // Add new rapidity
             
-        // ln n [yind][ktsqrind] 
-        std::vector< std::vector<REAL> > ln_n;
+        // n [yind][ktsqrind] 
+        std::vector< std::vector<REAL> > n;
 
         std::vector<REAL> ktsqrvals;
         std::vector<REAL> ktvals;
@@ -166,7 +166,7 @@ const REAL MINLN_N = -999;  // ln 0 = -\infty, so we need some finite lower cut
 
 const REAL KTSQRINTACCURACY = 0.005;  //0.001;
 const int KTSQRINTITERATIONS = 10000; // May be possible to use smaller one
-const int INTERPOLATION_POINTS = 6;
+const int INTERPOLATION_POINTS = 8;
 const int INTERPOLATION_POINTS_DER=50;  // 50 good if 2000 ktsqrpoints, 100 for 5000
 
 const REAL Q0SQR = 0.24; /*200; */    // 0.24 GeV^2 arXiv:0902.1112

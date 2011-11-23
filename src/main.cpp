@@ -431,19 +431,6 @@ int main(int argc, char* argv[])
     /******
      * Do some science with results
      *****/
-
-
-
-     ////////DEBUG
-    /*ChebyshevAmplitudeSolver* ch = (ChebyshevAmplitudeSolver*)N;
-    for (unsigned int i=0; i<=ch->ChebyshevDegree(); i++)
-    {
-        cout << ch->Coefficient(600, i) << endl;
-    }
-    return 0;
-    */
-
-     /////////////
     
 
     if (mode == GENERATE_DATAFILE)
@@ -524,6 +511,7 @@ void GenerateDataFile()
     output << "###" << std::scientific << std::setprecision(15) << N->MinKtsqr() << endl;
     output << "###" << std::scientific << std::setprecision(15) << N->KtsqrMultiplier() << endl;
     output << "###" << ktsqrpoints << endl;
+    output << "###0.01" << endl;
 
     int ystep=1;
     
@@ -570,6 +558,7 @@ void GenerateRDataFile()
     output << "###" << std::scientific << std::setprecision(15) <<
         rmultiplier  << endl;
     output << "###" << rpoints << endl;
+    output << "###0.01" << endl;    /// TODO: x0
 
     int ypoints = static_cast<int>(maxy/delta_y)+1;
 

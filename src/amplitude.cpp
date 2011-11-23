@@ -54,9 +54,9 @@ void Amplitude::Clear()
     lnktsqrvals.clear();
 	yvals.clear();
 
-    for (unsigned int i=0; i<ln_n.size(); i++)
-        ln_n[i].clear();
-    ln_n.clear();
+    for (unsigned int i=0; i<n.size(); i++)
+        n[i].clear();
+    n.clear();
     derivatives.clear();
  
 }
@@ -89,12 +89,10 @@ void Amplitude::Initialize()
     for (uint i=0; i<KtsqrPoints(); i++)
     {
         REAL icval = InitialCondition( ktsqrvals[i] );
-        REAL logicval = std::log(icval);
-        if (logicval > MINLN_N) tmpvec.push_back(logicval);
-        else tmpvec.push_back(MINLN_N);
+        tmpvec.push_back(icval);
         tmpdervec.push_back(0.0);
     }
-    ln_n.push_back(tmpvec);
+    n.push_back(tmpvec);
     derivatives.push_back(tmpdervec);
 }
 
@@ -104,28 +102,28 @@ void Amplitude::Initialize()
 
 REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
 {
-    REAL lnktsqr = std::log(ktsqr);
-    if (lnktsqr > lnktsqrvals[KtsqrPoints()-1] or lnktsqr < lnktsqrvals[0])
+   
+    if (ktsqr > 1.01*ktsqrvals[KtsqrPoints()-1] or 1.01*ktsqr < ktsqrvals[0])
         cerr << "Ktsqrval " << ktsqr << " is out of range [" << 
             MinKtsqr() << ", "  << MaxKtsqr() << "]! " << LINEINFO << endl;
     
     if (y<eps and datafile==false and derivative==false) return InitialCondition(ktsqr);
     if (y<eps) y=0;
+
     int ktsqrind;
-    if (lnktsqr>=lnktsqrvals[KtsqrPoints()-1]) return 0;
+
+    // Force ktsqr in range ]MinKtsqr(), MaxKtsqr()[
+    
+    if (ktsqr>=ktsqrvals[KtsqrPoints()-1]) ktsqr = ktsqrvals[KtsqrPoints()-1]*0.999;
+    
+    if (ktsqr <= ktsqrvals[0])
+        ktsqr = ktsqrvals[0]*1.001;
+        
     // Find ktsqrval and yval indexes refer to index for which
     // val[index]  is smaller than (or equal) y/ktsqr
-    if (lnktsqr <= lnktsqrvals[0])
-    {
-        ktsqrind = 0;
-        lnktsqr=lnktsqrvals[0]*0.99999;  // lnktsqrvals[0]<0
-        ktsqr = std::exp(lnktsqr);
-    }
-    else
-        ktsqrind = FindIndex(lnktsqr, lnktsqrvals);
+    ktsqrind = FindIndex(ktsqr, ktsqrvals);
 
     REAL kt = std::sqrt(ktsqr);
-    if (kt < ktvals[0]) kt=ktvals[0]*1.0000001;
     
     // Now we always have MinKtsqr() < ktsqr < MaxKtsqr() => interpolation works
 
@@ -152,7 +150,7 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
 	else if (ktsqrind + interpolation_points/2 > KtsqrPoints()-1 )
 	{
 		interpolation_end = KtsqrPoints()-1;
-		interpolation_start = KtsqrPoints()-interpolation_points-3;
+		interpolation_start = KtsqrPoints()-interpolation_points-2;
 	}
 	else
 	{
@@ -173,14 +171,15 @@ REAL Amplitude::N(REAL ktsqr, REAL y, bool bspline, bool derivative)
     {
 		tmpxarray[i-interpolation_start]=ktvals[i];
 
-        REAL y0 = std::exp(ln_n[yind][i]);
-        tmparray[i-interpolation_start] = y0;
+        REAL n0 = n[yind][i];
+        tmparray[i-interpolation_start] = n0;
 
         // Interpolate in y if possible
+        
 		if (yind < yvals.size()-1 )
         {
-            tmparray[i-interpolation_start]=y0
-                + (y - yvals[yind]) * (std::exp(ln_n[yind+1][i]) - y0)
+            tmparray[i-interpolation_start]=n0
+                + (y - yvals[yind]) * (n[yind+1][i] - n0)
                 / (yvals[yind+1]-yvals[yind]);
 		}
     }
@@ -216,13 +215,13 @@ void Amplitude::AddDataPoint(int ktsqrindex, int yindex, REAL value, REAL der)
     // BK at Y=Y_0+DELTA_Y, we start at ktsqrindex=0 and move to ktsqrindex=max
     // keeping Y=Y_0+DELTA_Y, then start at ktsqrindex=0 and Y=Y_0+2DELTA_Y
 
-    if (ktsqrindex < 0 or yindex < 0 or ktsqrindex > ln_n[yindex].size()-1)
+    if (ktsqrindex < 0 or yindex < 0 or ktsqrindex > n[yindex].size()-1)
     {
         cerr << "Invalid ktsqr/y index " << ktsqrindex << " / " << yindex << ". "
             << LINEINFO << endl;
         return;
     }
-    ln_n[yindex][ktsqrindex]=std::log(value);
+    n[yindex][ktsqrindex]=value;
 
     if (yindex>=1)
         derivatives[yindex-1][ktsqrindex]=der;
@@ -647,7 +646,7 @@ int Amplitude::ReadData(string file)
 	SetMaxKtsqr(minktsqr*std::pow(KtsqrMultiplier(), f.KtsqrPoints()));
 	Initialize();
 
-	f.GetData(ln_n, yvals);
+	f.GetData(n, yvals);
 
 	datafile=true;
 	return 0;
@@ -735,7 +734,7 @@ REAL Amplitude::MinKtsqr()
 
 REAL Amplitude::MaxKtsqr()
 {
-    return minktsqr*std::pow(ktsqr_multiplier, (int)KtsqrPoints());
+    return minktsqr*std::pow(ktsqr_multiplier, (int)(KtsqrPoints()-1));
 }
 
 bool Amplitude::KinematicalConstraint()
@@ -840,10 +839,10 @@ void Amplitude::AddRapidity(REAL y)
     std::vector<REAL> tmpdervec;
     for (uint i=0; i<KtsqrPoints(); i++)
     {
-        tmpvec.push_back(-99999999999); // ln N = -\infty => N = 0
+        tmpvec.push_back(0.0);
         tmpdervec.push_back(0.0);
     }
-    ln_n.push_back(tmpvec);
+    n.push_back(tmpvec);
     derivatives.push_back(tmpdervec);
 
 }

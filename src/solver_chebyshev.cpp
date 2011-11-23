@@ -176,7 +176,7 @@ void ChebyshevSolver::Prepare()
         uvals.push_back(std::cos(M_PI*(static_cast<REAL>(KtsqrPoints()-i))/(2.0*KtsqrPoints())));
       //  if (i < KtsqrPoints())
         ktsqrvals[i]=(std::exp( (-minl + maxl)*uvals[i]+minl ) );
-        ln_n[0][i] = std::log(InitialCondition(ktsqrvals[i]) );
+        n[0][i] = InitialCondition(ktsqrvals[i]);
     //    else
     //        ktsqrvals.push_back( exp( (-minl + maxl)*uvals[i]+minl ) );
     }

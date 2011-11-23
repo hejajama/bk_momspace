@@ -205,6 +205,7 @@ REAL BruteForceSolver::RapidityDerivative(REAL ktsqr, REAL y, const REAL* array)
 
     // Nonlinear term
     // if rc is {MIN,MAX}k, then result is already multiplied by alpha_s
+    
     if (RunningCoupling()==MAXK or RunningCoupling() == MINK)
         result -= SQR(N(ktsqr, y))*Alphabar_s(ktsqr, alphas_scaling);
     else
@@ -237,7 +238,7 @@ int Evolve(REAL y, const REAL amplitude[], REAL dydt[], void *params)
    return GSL_SUCCESS;
 }
 
-const REAL MINSTEP=0.01;
+const REAL MINSTEP=0.002;
 //const REAL MINSTEP=0.001;
 // Solve BK, lowest order
 void BruteForceSolver::Solve(REAL maxy)
@@ -263,7 +264,7 @@ void BruteForceSolver::Solve(REAL maxy)
     REAL *amplitude=new REAL[KtsqrPoints()];
     for (int ktsqrind=0; ktsqrind < KtsqrPoints(); ktsqrind++)
     {
-        amplitude[ktsqrind] = std::exp( ln_n[0][ktsqrind] );   // TODO: log?
+        amplitude[ktsqrind] = n[0][ktsqrind] ;  
     }
 
     REAL *ders = new REAL[KtsqrPoints()];
@@ -279,11 +280,12 @@ void BruteForceSolver::Solve(REAL maxy)
     // ******************************
     do
     {
-        cout << "Solving for y=" << nexty << endl;
+        
         // Solve N(y+DELTA_Y, kt) for every kt
 
         if (rungekutta)
         {
+            cout << "Solving for y=" << nexty << endl;
             Yi = nexty;
             // gsl_odeiv_evolve_apply increases Y according to the step size
             while (Y<Yi)
@@ -295,13 +297,17 @@ void BruteForceSolver::Solve(REAL maxy)
                         << ": " << gsl_strerror(status) << " (" << status << ")"
                         << " y=" << Y << ", h=" << h << endl;
                 }
-                //cout << "Evolved up to " << Y << "/" << Yi << ", h=" << h << endl;
-            } // end while (useless loop?)
-            //cout << "Solved yind " << yind << " to Y=" << Y << " with step size "
-            //        << h << endl;
+            } 
+
             AddRapidity(nexty); // During the evolution Y has evolved up to nexty  
             for (int ktsqrind = 0; ktsqrind < KtsqrPoints(); ktsqrind++)
             {
+                if (ktsqrind+1< KtsqrPoints())
+                {
+                    if (amplitude[ktsqrind+1] > amplitude[ktsqrind])
+                    cerr << "Amplitude increases as k increases! index " << ktsqrind+1 << "/" << KtsqrPoints()
+                    << " " << amplitude[ktsqrind] << "->" << amplitude[ktsqrind+1] << endl;
+                } 
                 AddDataPoint(ktsqrind, yind+1, amplitude[ktsqrind], 0.0);
             }
 
@@ -316,15 +322,16 @@ void BruteForceSolver::Solve(REAL maxy)
         for (int ktsqrind=0; ktsqrind<KtsqrPoints(); ktsqrind++)
         {
             if (!ok) continue;  // We will decrease the step size
-            REAL tmpkt = ktsqrvals[ktsqrind];
-            REAL tmpder = RapidityDerivative(tmpkt, yvals[yind]);
-            REAL oldn = std::exp(ln_n[yind][ktsqrind]);
+            REAL tmpktsqr = ktsqrvals[ktsqrind];
+            REAL tmpder = RapidityDerivative(tmpktsqr, yvals[yind]);
+            REAL oldn = n[yind][ktsqrind];
             REAL newn= oldn + dy*tmpder;
 
             // Adaptive step size (quite stupid one)
             // If reldiff > 0.1 and absdiff > 1e-5 then use smaller step size
             //if (std::abs(dy*tmpder) > 1e-3 and std::abs(dy*tmpder/oldn > 0.01)
             //    and (nexty-Y)*2.0/3.0 > MINSTEP)
+            
             #pragma omp critical
             {
                 if (ok==true and std::abs(dy*tmpder/oldn)>0.01 and (nexty-Y)*2.0/3.0 > MINSTEP)
@@ -352,20 +359,23 @@ void BruteForceSolver::Solve(REAL maxy)
             if (i+1<KtsqrPoints())
             {
                 if (amplitude[i+1] > amplitude[i])
-                cerr << "Amplitude increases as k increases!" << endl;
+                {
+                    cerr << "Amplitude increases as k increases! index " << i+1 << "/" << KtsqrPoints()
+                    << " " << amplitude[i] << "->" << amplitude[i+1] << endl;
+                }
             }
             AddDataPoint(i, yind+1, amplitude[i], ders[i] );
         }
-        cout << "Solved using y=" << nexty << " step " << step << endl;
-
+        cout << "Solved y=" << nexty << " step " << step << endl;
+        
         if (1.5*step < delta_y)
             step*=1.5;
         else
-            step = delta_y;
+           step = delta_y;
         Y = nexty;
         nexty += step;
         yind++;
-    }while(Y < maxy);
+    }while(Y <= maxy+delta_y);
 
     gsl_odeiv_evolve_free(e);
     gsl_odeiv_control_free(c);

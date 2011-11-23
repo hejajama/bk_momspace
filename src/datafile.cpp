@@ -95,10 +95,10 @@ DataFile::DataFile(string fname)
     }
 }
 
-void DataFile::GetData(std::vector< std::vector<REAL> > &ln_n,
+void DataFile::GetData(std::vector< std::vector<REAL> > &n,
                         std::vector<REAL> &rapidities)
 {
-	ln_n.clear();
+	n.clear();
     rapidities.clear();
     // Return vector where indexes are vec[y][ktsqr] containing ln of amplitude
 
@@ -107,12 +107,9 @@ void DataFile::GetData(std::vector< std::vector<REAL> > &ln_n,
         std::vector<REAL> tmpvec;
         for (uint kind=0; kind<ktsqrpoints; kind++)
         {
-            REAL tmpln_n = std::log(data[yind][kind]);
-            if (tmpln_n > MINLN_N) tmpvec.push_back(tmpln_n);
-            else
-                tmpvec.push_back(MINLN_N);
+            tmpvec.push_back(data[yind][kind]);
         }
-        ln_n.push_back(tmpvec);
+        n.push_back(tmpvec);
 
         rapidities.push_back(yvals[yind]);
         
